@@ -6,11 +6,13 @@
 	<title>{% if page.title %}{{ page.title }}{% else %}{{ site.title }}{% endif %}</title>
 
 	<!--link rel="stylesheet" href="{{ "/css/main.css" | prepend: site.baseurl }}"-->
-	<link rel="stylesheet" href="/assets/css/styles.scss">
+	<link rel="stylesheet" href="/style.css">
 	<link rel="canonical" href="{{ page.url | replace:'index.html','' | prepend: site.baseurl | prepend: site.url }}">
 	<!--link href='https://fonts.googleapis.com/css?family=Open+Sans:400,300,700,800,600' rel='stylesheet' type='text/css'>
 	<link href='https://fonts.googleapis.com/css?family=Muli:400,300' rel='stylesheet' type='text/css'-->
 	<link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Saira" rel="stylesheet">
+
 
 
 	<!-- Add Google Analytics -->
@@ -18,7 +20,7 @@
 	<style type="text/css">
 	
 		header {
-			font-family: 'Roboto', sans-serif;
+			font-family: 'Saira', sans-serif;
 			padding: 1.618em 0 0;
 			padding-left: 2em;
  			margin-bottom: 3.631em;
@@ -29,14 +31,9 @@
 			min-width:100%; /* play with this too, and asdjust margins. check in IE - you may have to set a width rather then min-width*/
 			}
 	
+		html { 
 
-		body, html {
-   			height: 100%;
-   			font-family: 'Roboto', sans-serif;
-
-   			}
-
-		.bg { 
+			height: 100%;
 		    /* The image used */
 		    background-image: url({{site.url}}/assets/img/sea.jpg);
 
@@ -52,7 +49,15 @@
 		    position: relative;
 		    z-index: -1;
 			
-			}
+		}
+
+		body {
+   			height: 100%;
+   			font-family: 'Roboto', sans-serif;
+
+   			}
+
+	
 
 </style>
 

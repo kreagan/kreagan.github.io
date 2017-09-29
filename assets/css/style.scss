@@ -1,12 +1,9 @@
 ---
-# This is so jekyll understands this is Front matter
 ---
-
-@import "{{ site.theme }}";
 
 
 	header {
-			font-family: 'Roboto', sans-serif;
+			font-family: 'Saira', sans-serif;
 			padding: 1.618em 0 0;
 			padding-left: 2em;
  			margin-bottom: 3.631em;
@@ -15,16 +12,11 @@
 			z-index: 100;/* set this to something high*/
 			background-color:none; /* so you can see it is a block */
 			min-width:100%; /* play with this too, and asdjust margins. check in IE - you may have to set a width rather then min-width*/
-			}
+		}
 	
+	html { 
 
-		body, html {
-   			height: 100%;
-   			font-family: 'Roboto', sans-serif;
-
-   			}
-
-		.bg { 
+			height: 100%;
 		    /* The image used */
 		    background-image: url({{site.url}}/assets/img/sea.jpg);
 
@@ -40,4 +32,15 @@
 		    position: relative;
 		    z-index: -1;
 			
-			}
+		}
+
+	body {
+   			height: 100%;
+   			font-family: 'Roboto', sans-serif;
+
+   		}
+
+   	footer {
+   			font-family: 'Saira', sans-serif;
+   			background-color: 'white'; 
+   		}

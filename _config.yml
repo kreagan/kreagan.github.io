@@ -25,7 +25,6 @@ sass:
   sass_dir: _sass
 include: ['_pages']
 markdown: kramdown
-theme: minima
 
 
 # Exclude from processing.
