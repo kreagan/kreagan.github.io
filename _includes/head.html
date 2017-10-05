@@ -6,59 +6,14 @@
 	<title>{% if page.title %}{{ page.title }}{% else %}{{ site.title }}{% endif %}</title>
 
 	<!--link rel="stylesheet" href="{{ "/css/main.css" | prepend: site.baseurl }}"-->
-	<link rel="stylesheet" href="/style.css">
 	<link rel="canonical" href="{{ page.url | replace:'index.html','' | prepend: site.baseurl | prepend: site.url }}">
 	<!--link href='https://fonts.googleapis.com/css?family=Open+Sans:400,300,700,800,600' rel='stylesheet' type='text/css'>
 	<link href='https://fonts.googleapis.com/css?family=Muli:400,300' rel='stylesheet' type='text/css'-->
 	<link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
 	<link href="https://fonts.googleapis.com/css?family=Saira" rel="stylesheet">
-
+	<link rel="stylesheet" href="/static/css/site.css">
 
 
 	<!-- Add Google Analytics -->
-	
-	<style type="text/css">
-	
-		header {
-			font-family: 'Saira', sans-serif;
-			padding: 1.618em 0 0;
-			padding-left: 2em;
- 			margin-bottom: 3.631em;
- 			clear: both;
-			position: fixed;
-			z-index: 100;/* set this to something high*/
-			background-color:none; /* so you can see it is a block */
-			min-width:100%; /* play with this too, and asdjust margins. check in IE - you may have to set a width rather then min-width*/
-			}
-	
-		html { 
-
-			height: 100%;
-		    /* The image used */
-		    background-image: url({{site.url}}/assets/img/sea.jpg);
-
-		    /* Full height */
-		    height: 100%; 
-
-		    /* Center and scale the image nicely */
-		    background-position: center;
-		    background-repeat: no-repeat;
-		    background-size: cover;
-
-		    /* Add z-index to see if that set background behind header */
-		    position: relative;
-		    z-index: -1;
-			
-		}
-
-		body {
-   			height: 100%;
-   			font-family: 'Roboto', sans-serif;
-
-   			}
-
-	
-
-</style>
 
 </head> 

@@ -25,7 +25,9 @@ sass:
   sass_dir: _sass
 include: ['_pages']
 markdown: kramdown
-
+sass:
+  sass_dir: _sass
+  style: compressed
 
 
 # Exclude from processing.

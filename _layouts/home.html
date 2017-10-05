@@ -1,14 +1,33 @@
----
-layout: default
----
+<!DOCTYPE html>
+<html lang="{{ page.lang | default: site.lang | default: "en" }}">
 
-<div class="home">
+  {% include head.html %}
 
-  <h1 class="page-heading">Coming Soon</h1>
-  
-  {{ content }}
+  <body>
 
-</div>
+    {% include header.html %}
 
-<div class="bg"></div>
+    <div class="bg"></div>
 
+
+    <main class="page-content" aria-label="Content">
+      
+      <div class="wrapper">
+
+        <div class="home">
+
+          {{ content }}
+
+        </div>
+
+        <div class="bg"> </div>
+
+      </div>
+
+        {% include footer.html %}
+
+    </main>
+    
+  </body>
+
+</html>

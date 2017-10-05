@@ -1,24 +1,8 @@
----
----
 
-
-	header {
-			font-family: 'Saira', sans-serif;
-			padding: 1.618em 0 0;
-			padding-left: 2em;
- 			margin-bottom: 3.631em;
- 			clear: both;
-			position: fixed;
-			z-index: 100;/* set this to something high*/
-			background-color:none; /* so you can see it is a block */
-			min-width:100%; /* play with this too, and asdjust margins. check in IE - you may have to set a width rather then min-width*/
-		}
-	
 	html { 
 
-			height: 100%;
 		    /* The image used */
-		    background-image: url({{site.url}}/assets/img/sea.jpg);
+		    background-image: url(img/sea.jpg);
 
 		    /* Full height */
 		    height: 100%; 
@@ -34,6 +18,18 @@
 			
 		}
 
+	header {
+			font-family: 'Saira', sans-serif;
+			padding: 1.618em 0 0;
+			padding-left: 2em;
+ 			margin-bottom: 3.631em;
+ 			clear: both;
+			position: fixed;
+			z-index: 100;/* set this to something high*/
+			background-color:none; /* so you can see it is a block */
+			min-width:100%; /* play with this too, and asdjust margins. check in IE - you may have to set a width rather then min-width*/
+		}
+	
 	body {
    			height: 100%;
    			font-family: 'Roboto', sans-serif;
