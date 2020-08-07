@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="{{ page.lang | default: site.lang | default: "en" }}">
+
+  {% include head.html %}
+
+  <body>
+
+    <!-- {% include header.html %} -->
+
+    <div class="bg"></div>
+
+
+    <main class="page-content" aria-label="Content">
+
+      <div class="wrapper">
+
+        <div class="golf">
+
+          {{ content }}
+
+        </div>
+
+        <div class="bg"> </div>
+
+      </div>
+
+        {% include footer.html %}
+
+    </main>
+
+  </body>
+
+  <script>
+window.addEventListener('load', function(){
+    var allimages= document.getElementsByTagName('img');
+    for (var i=0; i<allimages.length; i++) {
+        if (allimages[i].getAttribute('data-src')) {
+            allimages[i].setAttribute('src', allimages[i].getAttribute('data-src'));
+        }
+    }
+}, false)
+</script>
+</html>
