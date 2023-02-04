@@ -1,4 +1,4 @@
-# © 2020 — Kreagan
+# © 2023 — Kreagan
 
 ### In development.
 
@@ -7,6 +7,8 @@ Forced a rebuild on 13.11.2019 after GH Pages repo visibility issue.
 Updated to force https on 23.04.2020 ahead of redesign project.
 
 Update 06.08.2020 to try and show golf leaderboard
+
+Update 04.02.2023 to use ChatGPT for some quick clean up of old code
 
 ## Running the site locally
 
