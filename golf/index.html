@@ -559,15 +559,27 @@ function BugReportView(){
     </div></div>;}
 
 // ─── ESPN LIVE SCORES FETCH ───
+// ── CHANGE THIS to your Cloudflare Worker URL after deploying ──
+const CF_WORKER_URL = "https://golf-proxy.kreaganckennedy.workers.dev/";
+// ────────────────────────────────────────────────────────────────
+
+const MASTERS_URL = "https://www.masters.com/en_US/scores/feeds/2026/scores.json";
 const ESPN_HEADER_URL = "https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=golf&league=pga";
 const ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard";
 const CORS_PROXIES = [
   url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
 ];
 
 async function proxyFetch(url) {
+  // Try Cloudflare Worker first (fastest, most reliable)
+  if (CF_WORKER_URL && !CF_WORKER_URL.includes("YOUR-SUBDOMAIN")) {
+    try {
+      const res = await fetch(`${CF_WORKER_URL}?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) return await res.json();
+    } catch (e) {}
+  }
+  // Fallback to public CORS proxies
   for (const makeUrl of CORS_PROXIES) {
     try {
       const res = await fetch(makeUrl(url), { signal: AbortSignal.timeout(5000) });
@@ -579,7 +591,15 @@ async function proxyFetch(url) {
 }
 
 async function fetchESPNScores() {
-  // Fetch both ESPN endpoints in parallel: header (thru data) + scoreboard (full field)
+  // Try Masters.com first (full field + thru data) — only works via CF Worker
+  if (CF_WORKER_URL && !CF_WORKER_URL.includes("YOUR-SUBDOMAIN")) {
+    const mastersData = await proxyFetch(MASTERS_URL);
+    if (mastersData) {
+      const result = parseMastersData(mastersData);
+      if (result && result.golferCount > 0) return result;
+    }
+  }
+  // Fallback: ESPN merged
   const [headerData, scoreboardData] = await Promise.all([
     proxyFetch(ESPN_HEADER_URL),
     proxyFetch(ESPN_SCOREBOARD_URL)
