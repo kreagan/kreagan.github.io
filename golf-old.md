@@ -1,7 +1,7 @@
 ---
 layout: golf
 title: Golf
-permalink: /golf/
+permalink: /golf-old
 style: golf
 ---
 
