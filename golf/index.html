@@ -9,6 +9,15 @@
 <meta name="theme-color" content="#15803d" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <title>K&M Major Pool ⛳</title>
+<meta property="og:title" content="K&M Major Pool ⛳">
+<meta property="og:description" content="Live leaderboard for the 2026 Masters golf pool">
+<meta property="og:image" content="https://kreagan.github.io/static/css/img/nuble.jpg">
+<meta property="og:url" content="https://kreagan.com/golf/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="K&M Major Pool ⛳">
+<meta name="twitter:description" content="Live leaderboard for the 2026 Masters golf pool">
+<meta name="twitter:image" content="https://kreagan.github.io/static/css/img/nuble.jpg">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -542,9 +551,9 @@ function BugReportView(){
 // ─── ESPN LIVE SCORES FETCH ───
 const ESPN_GOLF_URL = "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard";
 const CORS_PROXIES = [
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
 ];
 
 async function fetchESPNScores() {
@@ -552,7 +561,7 @@ async function fetchESPNScores() {
     try {
       const proxyUrl = makeUrl(ESPN_GOLF_URL);
       console.log("[ESPN] Trying:", proxyUrl.substring(0, 60) + "...");
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) { console.log("[ESPN] HTTP error:", res.status); continue; }
       const data = await res.json();
       console.log("[ESPN] Got data, events:", data.events?.length, "leagues:", data.leagues?.length);
