@@ -107,7 +107,7 @@ function buildTiers(odds){const g=odds.map((s,i)=>({...parseOdds(s),rank:i+1,raw
 function getTier(raw,tiers){for(const[k,t]of Object.entries(tiers))if(t.golfers.some(g=>g.raw===raw))return k;return null;}
 
 // Score lookup handles both old format (number) and new format ({s, thru})
-function stripAccents(s){return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
+function stripAccents(s){return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/ø/g,"o").replace(/Ø/g,"O").replace(/å/g,"a").replace(/Å/g,"A").replace(/æ/g,"ae").replace(/Æ/g,"AE");}
 function getScore(scores,name){
   // Exact match first
   let v=scores[name];
