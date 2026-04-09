@@ -107,22 +107,29 @@ function buildTiers(odds){const g=odds.map((s,i)=>({...parseOdds(s),rank:i+1,raw
 function getTier(raw,tiers){for(const[k,t]of Object.entries(tiers))if(t.golfers.some(g=>g.raw===raw))return k;return null;}
 
 // Score lookup handles both old format (number) and new format ({s, thru})
+function stripAccents(s){return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
 function getScore(scores,name){
   // Exact match first
   let v=scores[name];
-  // Fuzzy match: try case-insensitive, then last-name match
+  // Case-insensitive match
   if(v==null){
     const lower=name.toLowerCase();
     const key=Object.keys(scores).find(k=>k.toLowerCase()===lower);
     if(key)v=scores[key];
   }
+  // Accent-stripped match (Hojgaard vs Højgaard, Olazabal vs Olazábal)
   if(v==null){
-    // Match on last name + first initial
+    const stripped=stripAccents(name.toLowerCase());
+    const key=Object.keys(scores).find(k=>stripAccents(k.toLowerCase())===stripped);
+    if(key)v=scores[key];
+  }
+  // Last name + first initial fallback
+  if(v==null){
     const parts=name.split(" ");
-    const lastName=parts[parts.length-1].toLowerCase();
+    const lastName=stripAccents(parts[parts.length-1].toLowerCase());
     const firstInit=parts[0]?parts[0][0].toLowerCase():"";
     const key=Object.keys(scores).find(k=>{
-      const kp=k.split(" ");const kLast=kp[kp.length-1].toLowerCase();const kFirst=kp[0]?kp[0][0].toLowerCase():"";
+      const kp=k.split(" ");const kLast=stripAccents(kp[kp.length-1].toLowerCase());const kFirst=kp[0]?kp[0][0].toLowerCase():"";
       return kLast===lastName&&kFirst===firstInit;
     });
     if(key)v=scores[key];
