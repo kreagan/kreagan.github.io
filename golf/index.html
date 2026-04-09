@@ -107,9 +107,9 @@ function buildTiers(odds){const g=odds.map((s,i)=>({...parseOdds(s),rank:i+1,raw
 function getTier(raw,tiers){for(const[k,t]of Object.entries(tiers))if(t.golfers.some(g=>g.raw===raw))return k;return null;}
 
 // Score lookup handles both old format (number) and new format ({s, thru})
-function getScore(scores,name){const v=scores[name];if(v==null)return{score:null,thru:null,rounds:null};if(typeof v==="number")return{score:v,thru:18,rounds:null};return{score:v.s,thru:v.thru,rounds:v.r||null};}
+function getScore(scores,name){const v=scores[name];if(v==null)return{score:null,thru:null,rounds:null,teeTime:null};if(typeof v==="number")return{score:v,thru:18,rounds:null,teeTime:null};return{score:v.s,thru:v.thru,rounds:v.r||null,teeTime:v.teeTime||null};}
 function calcScore(picks,scores){
-  const gs=picks.map(p=>{const n=parseOdds(p).name;const{score,thru,rounds}=getScore(scores,n);return{name:n,raw:p,score,thru,rounds};});
+  const gs=picks.map(p=>{const n=parseOdds(p).name;const{score,thru,rounds,teeTime}=getScore(scores,n);return{name:n,raw:p,score,thru,rounds,teeTime};});
   const ws=gs.filter(g=>g.score!==null).sort((a,b)=>a.score-b.score);const b4=ws.slice(0,4);
   return{golfers:gs.map(g=>({...g,counting:b4.some(b=>b.name===g.name)})),total:ws.length>=4?b4.reduce((s,g)=>s+g.score,0):null};}
 function fmt(s){return s==null?"–":s===0?"E":s>0?`+${s}`:`${s}`;}
@@ -136,7 +136,10 @@ function Banner({tournament:t}){if(!t)return null;
   return <div className="banner"><div><span className="bn">{t.name}</span>
     {t.course&&<span className="bc">{t.course}</span>}</div><span className={`badge ${s.c}`}>{s.l}</span></div>;}
 
-function ThruBadge({thru}){if(thru==null)return <span className="thru-badge">–</span>;
+function ThruBadge({thru,teeTime}){
+  if(thru===0&&teeTime)return <span className="thru-badge tee">{typeof teeTime==="string"&&teeTime.match(/\d+:\d+/)?teeTime:new Date(teeTime).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</span>;
+  if(thru===0)return <span className="thru-badge">–</span>;
+  if(thru==null)return <span className="thru-badge">–</span>;
   const done=thru>=18;return <span className={`thru-badge ${done?"done":"live"}`}>{done?"F":thru}</span>;}
 
 function RoundBadges({rounds}){if(!rounds)return null;
@@ -211,7 +214,7 @@ function LeaderboardView({tournament,picks,scores,lastUpdated,onRefresh,liveStat
         <span key={`r2${j}`} className="ds rd hide-mobile-sm">{rd[1]??"-"}</span>,
         <span key={`r3${j}`} className="ds rd hide-mobile-sm">{rd[2]??"-"}</span>,
         <span key={`r4${j}`} className="ds rd hide-mobile-sm">{rd[3]??"-"}</span>,
-        <span key={`t${j}`} className="ds"><ThruBadge thru={g.thru}/></span>];})}
+        <span key={`t${j}`} className="ds"><ThruBadge thru={g.thru} teeTime={g.teeTime}/></span>];})}
     </div><div className="df">Best 4 = <strong>{e.total!=null?fmt(e.total):"waiting"}</strong>
       <span className="sep">·</span>TB: {e.tb}<span className="sep">·</span><span className="dot"/> = counting</div></div>}
     </div>)}</div>
@@ -272,7 +275,7 @@ function TeamsView({picks,scores}){
               </div>
               <div className="tc-g-right">
                 <span className={`sv ${g.score==null?"n":g.score<0?"u":g.score>0?"o":"ep"}`}>{fmt(g.score)}</span>
-                <ThruBadge thru={g.thru}/>
+                <ThruBadge thru={g.thru} teeTime={g.teeTime}/>
               </div>
             </div>
             {g.rounds&&<div className="tc-g-rounds"><RoundBadges rounds={g.rounds}/></div>}
@@ -315,9 +318,15 @@ function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatu
       const n=parseOdds(p).name;pickedBy[n]=(pickedBy[n]||[]);pickedBy[n].push(d.name);
     }));
     return Object.entries(scores).map(([name,v])=>{
-      const{score,thru,rounds}=typeof v==="number"?{score:v,thru:18,rounds:null}:{score:v.s,thru:v.thru,rounds:v.r||null};
-      return {name,score,thru,rounds,owners:pickedBy[name]||[]};
-    }).sort((a,b)=>a.score-b.score);
+      const{score,thru,rounds,teeTime}=typeof v==="number"?{score:v,thru:18,rounds:null,teeTime:null}:{score:v.s,thru:v.thru,rounds:v.r||null,teeTime:v.teeTime||null};
+      return {name,score,thru,rounds,teeTime,owners:pickedBy[name]||[]};
+    }).sort((a,b)=>{
+      // Players with scores first, sorted by score; then not-started players at the end
+      if(a.score==null&&b.score==null)return 0;
+      if(a.score==null)return 1;
+      if(b.score==null)return -1;
+      return a.score-b.score;
+    });
   },[scores,picks]);
 
   // Assign positions with ties
@@ -365,13 +374,13 @@ function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatu
         const rd=g.rounds||[null,null,null,null];
         const hasPicked=g.owners.length>0;
         return <div key={g.name} className={`sb-row ${i%2===0?"ev":"od"} ${hasPicked?"picked":""}`}>
-          <span className="sb-pos">{pos<=3?pos===1?"🥇":pos===2?"🥈":"🥉":pos}{field[origIdx-1]&&field[origIdx-1].score===g.score?"T":""}</span>
+          <span className="sb-pos">{g.score!=null?(pos<=3?pos===1?"🥇":pos===2?"🥈":"🥉":pos)+(field[origIdx-1]&&field[origIdx-1].score===g.score?"T":""):"–"}</span>
           <span className="sb-name">
             <span className="sb-gname">{g.name}</span>
             {hasPicked&&<span className="sb-owners">{g.owners.join(", ")}</span>}
           </span>
-          <span className={`sb-scr sv ${g.score<0?"u":g.score>0?"o":"ep"}`}>{fmt(g.score)}</span>
-          <span className="sb-thru"><ThruBadge thru={g.thru}/></span>
+          <span className={`sb-scr sv ${g.score==null?"n":g.score<0?"u":g.score>0?"o":"ep"}`}>{g.score!=null?fmt(g.score):"–"}</span>
+          <span className="sb-thru"><ThruBadge thru={g.thru} teeTime={g.teeTime}/></span>
           <span className="sb-r hide-mobile-sm rd-cell">{rd[0]??"-"}</span>
           <span className="sb-r hide-mobile-sm rd-cell">{rd[1]??"-"}</span>
           <span className="sb-r hide-mobile-sm rd-cell">{rd[2]??"-"}</span>
@@ -598,28 +607,54 @@ function parseESPNData(data) {
 
       // Score to par — ESPN uses different field names
       let scoreToPar = null;
-      if (c.score != null) scoreToPar = parseInt(c.score);
+      if (c.score != null && c.score !== "") scoreToPar = parseInt(c.score);
       else if (c.statistics) {
-        // Sometimes score is in statistics array
         const parStat = c.statistics.find(s => s.name === "scoreToPar" || s.name === "relativeScore");
         if (parStat) scoreToPar = parseInt(parStat.value);
       }
 
-      // Status/thru
+      // Status — ESPN golf status structure
       const status = c.status || {};
-      const statusDesc = status.type?.description || status.displayValue || "";
+      const statusType = status.type?.name || status.type?.description || "";
+      const statusDesc = status.type?.description || "";
+      const displayValue = status.displayValue || "";
+      const period = status.period || 0; // This is the ROUND number (1-4), not hole
+
+      // Determine thru (hole number in current round)
       let hole = null;
-      if (statusDesc === "Final" || statusDesc === "F") hole = 18;
-      else if (statusDesc === "Cut" || statusDesc === "MDF" || statusDesc === "WD" || statusDesc === "DQ") hole = 18;
-      else if (status.period) hole = parseInt(status.period);
-      else if (status.thru) hole = parseInt(status.thru);
-      else if (status.displayValue) {
-        const thruMatch = statusDesc.match(/^(\d+)$/);
-        if (thruMatch) hole = parseInt(thruMatch[1]);
-        if (statusDesc === "F") hole = 18;
+      let teeTime = null;
+
+      if (statusType === "STATUS_FINAL" || statusDesc === "Final" || displayValue === "F") {
+        hole = 18;
+      } else if (statusType === "STATUS_CUT" || statusDesc === "Cut" || statusDesc === "MDF" || statusDesc === "WD" || statusDesc === "DQ") {
+        hole = 18;
+      } else if (statusType === "STATUS_SCHEDULED" || statusType === "STATUS_PRE_EVENT" || statusDesc === "Scheduled") {
+        // Player hasn't started — try to get tee time
+        hole = 0;
+        teeTime = status.startDate || status.teeTime || c.startDate || null;
+        // Also check displayValue for time like "1:44 PM"
+        if (!teeTime && displayValue && displayValue.match(/\d+:\d+/)) {
+          teeTime = displayValue;
+        }
+      } else if (statusType === "STATUS_IN_PROGRESS" || statusDesc === "In Progress") {
+        // Active on course — displayValue often shows hole number like "Thru 7" or just "7"
+        if (displayValue) {
+          const thruMatch = displayValue.match(/(\d+)/);
+          if (thruMatch) hole = parseInt(thruMatch[1]);
+        }
+        if (!hole && status.thru) hole = parseInt(status.thru);
+        if (!hole) hole = null; // truly unknown, show as in-progress
+        anyActive = true;
+      } else {
+        // Fallback — try to parse displayValue
+        if (displayValue === "F") hole = 18;
+        else if (displayValue.match(/^\d+$/)) hole = parseInt(displayValue);
+        else if (displayValue.match(/\d+:\d+/)) { hole = 0; teeTime = displayValue; }
+        else if (status.thru) hole = parseInt(status.thru);
+        else hole = 18; // default finished if has score
       }
 
-      if (hole && hole < 18 && hole > 0) anyActive = true;
+      if (hole && hole > 0 && hole < 18) anyActive = true;
 
       // Round scores from linescores
       const rounds = (c.linescores || []).map(ls => {
@@ -628,8 +663,12 @@ function parseESPNData(data) {
       });
       while (rounds.length < 4) rounds.push(null);
 
+      // Store all players — even those without scores yet (tee times)
       if (scoreToPar != null && !isNaN(scoreToPar)) {
-        scores[name] = { s: scoreToPar, thru: hole || 18, r: rounds };
+        scores[name] = { s: scoreToPar, thru: hole, r: rounds, teeTime };
+      } else if (hole === 0 && teeTime) {
+        // Player hasn't started — store with null score so they appear on scoreboard
+        scores[name] = { s: null, thru: 0, r: rounds, teeTime };
       }
     }
 
@@ -744,6 +783,7 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
 .u{color:var(--gd)}.o{color:#ef4444}.ep{color:var(--tx)}.n{color:var(--dim)}
 
 .thru-badge{font-size:11px;font-family:var(--fm);padding:2px 6px;border-radius:6px;font-weight:600;color:var(--dim);background:var(--sa)}
+.thru-badge.tee{color:#d97706;background:rgba(234,179,8,.12);font-size:10px}
 .thru-badge.done{color:var(--dim)}.thru-badge.live{color:var(--gd);background:var(--gl)}
 
 .lb{border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
