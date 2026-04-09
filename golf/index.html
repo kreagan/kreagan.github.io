@@ -107,7 +107,30 @@ function buildTiers(odds){const g=odds.map((s,i)=>({...parseOdds(s),rank:i+1,raw
 function getTier(raw,tiers){for(const[k,t]of Object.entries(tiers))if(t.golfers.some(g=>g.raw===raw))return k;return null;}
 
 // Score lookup handles both old format (number) and new format ({s, thru})
-function getScore(scores,name){const v=scores[name];if(v==null)return{score:null,thru:null,rounds:null,teeTime:null};if(typeof v==="number")return{score:v,thru:18,rounds:null,teeTime:null};return{score:v.s,thru:v.thru,rounds:v.r||null,teeTime:v.teeTime||null};}
+function getScore(scores,name){
+  // Exact match first
+  let v=scores[name];
+  // Fuzzy match: try case-insensitive, then last-name match
+  if(v==null){
+    const lower=name.toLowerCase();
+    const key=Object.keys(scores).find(k=>k.toLowerCase()===lower);
+    if(key)v=scores[key];
+  }
+  if(v==null){
+    // Match on last name + first initial
+    const parts=name.split(" ");
+    const lastName=parts[parts.length-1].toLowerCase();
+    const firstInit=parts[0]?parts[0][0].toLowerCase():"";
+    const key=Object.keys(scores).find(k=>{
+      const kp=k.split(" ");const kLast=kp[kp.length-1].toLowerCase();const kFirst=kp[0]?kp[0][0].toLowerCase():"";
+      return kLast===lastName&&kFirst===firstInit;
+    });
+    if(key)v=scores[key];
+  }
+  if(v==null)return{score:null,thru:null,rounds:null,teeTime:null};
+  if(typeof v==="number")return{score:v,thru:18,rounds:null,teeTime:null};
+  return{score:v.s,thru:v.thru,rounds:v.r||null,teeTime:v.teeTime||null};
+}
 function calcScore(picks,scores){
   const gs=picks.map(p=>{const n=parseOdds(p).name;const{score,thru,rounds,teeTime}=getScore(scores,n);return{name:n,raw:p,score,thru,rounds,teeTime};});
   const ws=gs.filter(g=>g.score!==null).sort((a,b)=>a.score-b.score);const b4=ws.slice(0,4);
@@ -593,19 +616,13 @@ async function proxyFetch(url) {
 async function fetchESPNScores() {
   // Try Masters.com first (full field + thru data) — only works via CF Worker
   if (CF_WORKER_URL && !CF_WORKER_URL.includes("YOUR-SUBDOMAIN")) {
-    console.log("[FETCH] Trying Masters.com via CF Worker...");
     const mastersData = await proxyFetch(MASTERS_URL);
     if (mastersData) {
-      console.log("[FETCH] Masters.com response keys:", Object.keys(mastersData).join(", "));
-      console.log("[FETCH] Masters.com sample:", JSON.stringify(mastersData).substring(0, 500));
       const result = parseMastersData(mastersData);
       if (result && result.golferCount > 0) {
-        console.log("[FETCH] Masters.com success:", result.golferCount, "golfers");
         return result;
       }
-      console.log("[FETCH] Masters.com parse failed, falling back to ESPN");
     } else {
-      console.log("[FETCH] Masters.com fetch returned null, falling back to ESPN");
     }
   }
   // Fallback: ESPN merged
@@ -710,7 +727,6 @@ function parseESPNMerged(headerData, scoreboardData) {
   }
 
   const golferCount = Object.keys(scores).length;
-  console.log("[ESPN] Merged:", golferCount, "golfers");
   return golferCount > 0 ? { scores, tournamentName, anyActive, golferCount } : null;
 }
 
@@ -808,7 +824,7 @@ function parseESPNData(data) {
       anyActive,
       golferCount: Object.keys(scores).length
     };
-  } catch (e) { console.log("[ESPN] Parse error:", e.message); return null; }
+  } catch (e) { return null; }
 }
 
 // ─── APP ───
