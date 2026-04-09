@@ -579,89 +579,126 @@ async function proxyFetch(url) {
 }
 
 async function fetchESPNScores() {
-  console.log("[ESPN] Fetching both endpoints...");
-  // Fetch both in parallel
+  // Fetch both ESPN endpoints in parallel: header (thru data) + scoreboard (full field)
   const [headerData, scoreboardData] = await Promise.all([
     proxyFetch(ESPN_HEADER_URL),
     proxyFetch(ESPN_SCOREBOARD_URL)
   ]);
+  return parseESPNMerged(headerData, scoreboardData);
+}
 
-  // Parse header (top 25 with rich thru/teeTime data)
-  let headerScores = {};
-  let headerNames = new Set();
-  let tournamentName = "Tournament";
+function parseMastersData(data) {
+  try {
+    // Masters.com scores.json structure: data.player[] with full details
+    const players = data.player || data.players || data.data?.player || [];
+    if (!players.length) {
+      // Try alternate structure
+        return null;
+    }
+    const scores = {};
+    let anyActive = false;
+    for (const p of players) {
+      const first = p.first_name || p.firstName || "";
+      const last = p.last_name || p.lastName || "";
+      const name = p.display_name || p.displayName || `${first} ${last}`.trim();
+      if (!name) continue;
+
+      let scoreToPar = null;
+      const topar = p.topar ?? p.to_par ?? p.total ?? p.score;
+      if (topar === "E" || topar === 0 || topar === "0") scoreToPar = 0;
+      else if (topar != null) scoreToPar = parseInt(topar);
+      if (isNaN(scoreToPar)) scoreToPar = null;
+
+      const thruVal = p.thru ?? p.today_thru ?? p.holes;
+      let thru = null;
+      let teeTime = null;
+      if (thruVal === "F" || thruVal === 18 || thruVal === "18") thru = 18;
+      else if (thruVal === "-" || thruVal === "" || thruVal == null) {
+        thru = 0;
+        teeTime = p.teetime || p.tee_time || p.start_time || null;
+      } else if (typeof thruVal === "number") {
+        thru = thruVal;
+        if (thru > 0 && thru < 18) anyActive = true;
+      } else if (typeof thruVal === "string" && thruVal.match(/^\d+$/)) {
+        thru = parseInt(thruVal);
+        if (thru > 0 && thru < 18) anyActive = true;
+      } else if (typeof thruVal === "string" && thruVal.match(/\d+:\d+/)) {
+        thru = 0;
+        teeTime = thruVal;
+      }
+
+      const r1 = p.round1 ?? p.r1 ?? p.rounds?.[0] ?? null;
+      const r2 = p.round2 ?? p.r2 ?? p.rounds?.[1] ?? null;
+      const r3 = p.round3 ?? p.r3 ?? p.rounds?.[2] ?? null;
+      const r4 = p.round4 ?? p.r4 ?? p.rounds?.[3] ?? null;
+      const rounds = [r1, r2, r3, r4].map(v => v != null && !isNaN(parseInt(v)) ? parseInt(v) : null);
+
+      scores[name] = { s: scoreToPar, thru, r: rounds, teeTime };
+    }
+    return { scores, tournamentName: "Masters Tournament", anyActive, golferCount: Object.keys(scores).length };
+  } catch (e) { console.log("[MASTERS] Parse error:", e.message); return null; }
+}
+
+function parseESPNMerged(headerData, scoreboardData) {
+  let scores = {};
+  let tournamentName = "Masters Tournament";
   let anyActive = false;
 
+  // Scoreboard: full field
+  if (scoreboardData?.events) {
+    const event = scoreboardData.events[0];
+    tournamentName = event?.name || tournamentName;
+    const competition = event?.competitions?.[0];
+    for (const c of (competition?.competitors || [])) {
+      const name = c.athlete?.displayName || c.athlete?.shortName;
+      if (!name) continue;
+      let scoreToPar = null;
+      if (c.score === "E" || c.score === "0" || c.score === 0) scoreToPar = 0;
+      else if (c.score != null && c.score !== "") scoreToPar = parseInt(c.score);
+      if (isNaN(scoreToPar)) scoreToPar = null;
+      const rounds = (c.linescores || []).map(ls => ls.value != null ? parseInt(ls.value) : null);
+      while (rounds.length < 4) rounds.push(null);
+      scores[name] = { s: scoreToPar, thru: scoreToPar != null ? null : 0, r: rounds, teeTime: null };
+    }
+  }
+
+  // Header: overlay with rich thru data (uses full names, so merge by matching)
   if (headerData?.sports) {
     const event = headerData.sports[0]?.leagues?.[0]?.events?.[0];
     if (event) {
-      tournamentName = event.name || "Tournament";
       for (const c of (event.competitors || [])) {
         const name = c.name || c.displayName;
         if (!name) continue;
-        // Handle "E" for even par
         let scoreToPar = null;
         if (c.score === "E" || c.score === "0") scoreToPar = 0;
-        else if (c.score != null && c.score !== "") scoreToPar = parseInt(c.score);
+        else if (c.score != null) scoreToPar = parseInt(c.score);
         if (isNaN(scoreToPar)) scoreToPar = null;
-
         const st = c.status || {};
         let thru = 18, teeTime = null;
         if (st.state === "pre") {
           thru = 0;
           teeTime = st.teeTime || null;
           if (teeTime && teeTime.match(/^\d{4}-/)) try { teeTime = new Date(teeTime).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}); } catch(e) {}
-          if (!teeTime && st.displayValue?.match(/\d+:\d+/)) teeTime = st.displayValue.replace(/\s*ET$/i,"").trim();
         } else if (st.state === "in") {
-          thru = st.hole || parseInt((st.displayValue?.match(/(\d+)/) || [])[1]) || null;
+          thru = st.hole || null;
           anyActive = true;
-        } else { thru = 18; }
+        }
         const rounds = (c.linescores || []).map(ls => { const v = typeof ls === "object" ? ls.value : ls; return v != null ? parseInt(v) : null; });
         while (rounds.length < 4) rounds.push(null);
-        headerScores[name] = { s: scoreToPar, thru, r: rounds, teeTime };
-        headerNames.add(name);
+        // Find matching scoreboard entry (could be abbreviated)
+        const matchKey = Object.keys(scores).find(k => k === name || k.endsWith(name.split(" ").pop()));
+        if (matchKey) {
+          scores[matchKey] = { s: scoreToPar, thru, r: rounds, teeTime };
+        } else {
+          scores[name] = { s: scoreToPar, thru, r: rounds, teeTime };
+        }
       }
     }
-    console.log("[ESPN] Header: parsed", Object.keys(headerScores).length, "golfers");
   }
 
-  // Parse scoreboard (full field of 91 but no thru/teeTime)
-  let fullScores = {};
-  if (scoreboardData?.events) {
-    const event = scoreboardData.events[0];
-    if (!tournamentName || tournamentName === "Tournament") tournamentName = event?.name || "Tournament";
-    const competition = event?.competitions?.[0];
-    for (const c of (competition?.competitors || [])) {
-      const name = c.athlete?.displayName || c.athlete?.shortName;
-      if (!name) continue;
-      // Handle "E" for even par
-      let scoreToPar = null;
-      if (c.score === "E" || c.score === "0" || c.score === 0) scoreToPar = 0;
-      else if (c.score != null && c.score !== "") scoreToPar = parseInt(c.score);
-      if (isNaN(scoreToPar)) scoreToPar = null;
-
-      const rounds = (c.linescores || []).map(ls => ls.value != null ? parseInt(ls.value) : null);
-      while (rounds.length < 4) rounds.push(null);
-      // For scoreboard-only players: use null for thru (shows "–") since we don't know their actual status
-      // Only players in the header get accurate thru values
-      fullScores[name] = { s: scoreToPar, thru: scoreToPar != null ? null : 0, r: rounds, teeTime: null };
-    }
-    console.log("[ESPN] Scoreboard: parsed", Object.keys(fullScores).length, "golfers");
-  }
-
-  // Merge: start with full scoreboard, then overlay header data (which has better thru/teeTime)
-  const merged = { ...fullScores };
-  for (const [name, data] of Object.entries(headerScores)) {
-    merged[name] = data; // header data overwrites with richer info
-  }
-
-  const golferCount = Object.keys(merged).length;
-  console.log("[ESPN] Merged:", golferCount, "golfers, active:", anyActive);
-
-  if (golferCount > 0) {
-    return { scores: merged, tournamentName, anyActive, golferCount };
-  }
-  return null;
+  const golferCount = Object.keys(scores).length;
+  console.log("[ESPN] Merged:", golferCount, "golfers");
+  return golferCount > 0 ? { scores, tournamentName, anyActive, golferCount } : null;
 }
 
 function parseESPNData(data) {
@@ -675,14 +712,10 @@ function parseESPNData(data) {
       const league = data.sports?.[0]?.leagues?.[0];
       event = league?.events?.[0];
       competitors = event?.competitors || [];
-      console.log("[ESPN] Header format — event:", event?.name, "competitors:", competitors.length);
-      if (competitors.length > 0) console.log("[ESPN DEBUG header[0]]", JSON.stringify(competitors[0]).substring(0, 600));
     } else if (data.events) {
       event = data.events[0];
       const competition = event?.competitions?.[0];
       competitors = competition?.competitors || [];
-      console.log("[ESPN] Scoreboard format — event:", event?.name, "competitors:", competitors.length);
-      if (competitors.length > 0) console.log("[ESPN DEBUG scoreboard[0]]", JSON.stringify(competitors[0]).substring(0, 600));
     }
 
     if (!event || !competitors.length) return null;
