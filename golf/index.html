@@ -338,8 +338,76 @@ function TeamsView({picks,scores}){
     </div>
   </div>;}
 
+// ─── HOLE SCORECARD ───
+// Augusta National pars (standard)
+const AUGUSTA_PARS = [4,5,4,3,4,3,4,5,4,4,4,3,5,4,5,3,4,4];
+const HOLE_NAMES = ["Tea Olive","Pink Dogwood","Flowering Peach","Flowering Crab Apple","Magnolia","Juniper","Pampas","Yellow Jasmine","Carolina Cherry","Camellia","White Dogwood","Golden Bell","Azalea","Chinese Fir","Firethorn","Redbud","Nandina","Holly"];
+
+function HoleScorecard({holeScores,coursePars,playerThru}){
+  if(!holeScores)return null;
+  const pars=coursePars||AUGUSTA_PARS;
+  // Find which rounds have data
+  const activeRounds=holeScores.map((rd,i)=>rd&&rd.some(s=>s!=null)?i:null).filter(x=>x!==null);
+  if(!activeRounds.length)return <div style={{padding:"12px 16px",fontSize:13,color:"var(--dim)"}}>No hole data available</div>;
+
+  return <div className="scorecard">{activeRounds.map(ri=>{
+    const rd=holeScores[ri];if(!rd)return null;
+    const front=rd.slice(0,9);const back=rd.slice(9,18);
+    const frontPars=pars.slice(0,9);const backPars=pars.slice(9,18);
+    const frontTotal=front.reduce((s,v)=>s+(v||0),0);const backTotal=back.reduce((s,v)=>s+(v||0),0);
+    const frontPar=frontPars.reduce((s,v)=>s+v,0);const backPar=backPars.reduce((s,v)=>s+v,0);
+    return <div key={ri} className="sc-round">
+      <div className="sc-round-label">Round {ri+1}</div>
+      <div className="sc-grid">
+        <div className="sc-header-row">
+          <span className="sc-label">Hole</span>
+          {front.map((_,h)=><span key={h} className="sc-hole-num">{h+1}</span>)}
+          <span className="sc-hole-num sc-out">Out</span>
+        </div>
+        <div className="sc-header-row">
+          <span className="sc-label">Par</span>
+          {frontPars.map((p,h)=><span key={h} className="sc-par">{p}</span>)}
+          <span className="sc-par sc-out">{frontPar}</span>
+        </div>
+        <div className="sc-score-row">
+          <span className="sc-label">Score</span>
+          {front.map((s,h)=>{
+            const p=frontPars[h];const cls=s==null?"sc-empty":s<p-1?"sc-dbeagle":s===p-1?"sc-birdie":s===p?"sc-par-hole":s===p+1?"sc-bogey":"sc-dbogey";
+            return <span key={h} className={`sc-cell ${cls}`}>{s??""}</span>;
+          })}
+          <span className="sc-cell sc-out">{frontTotal||""}</span>
+        </div>
+        <div className="sc-header-row" style={{marginTop:6}}>
+          <span className="sc-label">Hole</span>
+          {back.map((_,h)=><span key={h} className="sc-hole-num">{h+10}</span>)}
+          <span className="sc-hole-num sc-out">In</span>
+        </div>
+        <div className="sc-header-row">
+          <span className="sc-label">Par</span>
+          {backPars.map((p,h)=><span key={h} className="sc-par">{p}</span>)}
+          <span className="sc-par sc-out">{backPar}</span>
+        </div>
+        <div className="sc-score-row">
+          <span className="sc-label">Score</span>
+          {back.map((s,h)=>{
+            const p=backPars[h];const cls=s==null?"sc-empty":s<p-1?"sc-dbeagle":s===p-1?"sc-birdie":s===p?"sc-par-hole":s===p+1?"sc-bogey":"sc-dbogey";
+            return <span key={h} className={`sc-cell ${cls}`}>{s??""}</span>;
+          })}
+          <span className="sc-cell sc-out">{backTotal||""}</span>
+        </div>
+        <div className="sc-total-row">
+          <span className="sc-label">Total</span>
+          <span className="sc-total-val">{(frontTotal+backTotal)||""}</span>
+          <span className="sc-total-par">Par {frontPar+backPar} · {(frontTotal+backTotal)-(frontPar+backPar)>0?"+":""}{(frontTotal+backTotal)-(frontPar+backPar)===0?"E":(frontTotal+backTotal)-(frontPar+backPar)}</span>
+        </div>
+      </div>
+    </div>;
+  })}</div>;
+}
+
 // ─── SCOREBOARD (actual tournament leaderboard) ───
-function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatus,autoRefresh,setAutoRefresh}){
+function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatus,autoRefresh,setAutoRefresh,coursePars}){
+  const[expanded,setExpanded]=useState(null);
   // Build full field leaderboard from scores
   const field=useMemo(()=>{
     if(!scores||!Object.keys(scores).length) return [];
@@ -350,7 +418,8 @@ function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatu
     }));
     return Object.entries(scores).map(([name,v])=>{
       const{score,thru,rounds,teeTime}=typeof v==="number"?{score:v,thru:18,rounds:null,teeTime:null}:{score:v.s,thru:v.thru,rounds:v.r||null,teeTime:v.teeTime||null};
-      return {name,score,thru,rounds,teeTime,owners:pickedBy[name]||[]};
+      const holes=v?.holes||null;
+      return {name,score,thru,rounds,teeTime,holes,owners:pickedBy[name]||[]};
     }).sort((a,b)=>{
       // Players with scores first, sorted by score; then not-started players at the end
       if(a.score==null&&b.score==null)return 0;
@@ -401,13 +470,14 @@ function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatu
       {filtered.map((g,i)=>{
         const origIdx=field.indexOf(g);
         const pos=positions[origIdx];
-        const posStr=pos===positions[origIdx-1]?"":pos<=positions[origIdx-1]?pos:pos;
         const rd=g.rounds||[null,null,null,null];
         const hasPicked=g.owners.length>0;
-        return <div key={g.name} className={`sb-row ${i%2===0?"ev":"od"} ${hasPicked?"picked":""}`}>
+        const isExp=expanded===g.name;
+        return <div key={g.name}>
+          <div className={`sb-row ${i%2===0?"ev":"od"} ${hasPicked?"picked":""}`} onClick={()=>setExpanded(isExp?null:g.name)} style={{cursor:"pointer"}}>
           <span className="sb-pos">{g.score!=null?(pos<=3?pos===1?"🥇":pos===2?"🥈":"🥉":pos)+(field[origIdx-1]&&field[origIdx-1].score===g.score?"T":""):"–"}</span>
           <span className="sb-name">
-            <span className="sb-gname">{g.name}</span>
+            <span className="sb-gname">{g.name}<span className="exp-a">{isExp?"▲":"▼"}</span></span>
             {hasPicked&&<span className="sb-owners">{g.owners.join(", ")}</span>}
           </span>
           <span className={`sb-scr sv ${g.score==null?"n":g.score<0?"u":g.score>0?"o":"ep"}`}>{g.score!=null?fmt(g.score):"–"}</span>
@@ -416,6 +486,8 @@ function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatu
           <span className="sb-r hide-mobile-sm rd-cell">{rd[1]??"-"}</span>
           <span className="sb-r hide-mobile-sm rd-cell">{rd[2]??"-"}</span>
           <span className="sb-r hide-mobile-sm rd-cell">{rd[3]??"-"}</span>
+          </div>
+          {isExp&&<div className="sb-expanded"><HoleScorecard holeScores={g.holes} coursePars={coursePars?.[0]} playerThru={g.thru}/></div>}
         </div>;
       })}
     </div>
@@ -644,6 +716,11 @@ function parseMastersData(data) {
   try {
     const players = data.data?.player || data.player || [];
     if (!players.length) return null;
+    // Extract course pars from data
+    const pars1 = data.data?.pars?.round1 || data.pars?.round1 || [4,5,4,3,4,3,4,5,4,4,4,3,5,4,5,3,4,4];
+    const pars2 = data.data?.pars?.round2 || data.pars?.round2 || pars1;
+    const coursePars = [pars1, pars2, pars1, pars1]; // pars per round
+
     const scores = {};
     let anyActive = false;
     for (const p of players) {
@@ -669,10 +746,17 @@ function parseMastersData(data) {
       const r3 = p.round3?.total != null ? parseInt(p.round3.total) : null;
       const r4 = p.round4?.total != null ? parseInt(p.round4.total) : null;
       const rounds = [isNaN(r1)?null:r1, isNaN(r2)?null:r2, isNaN(r3)?null:r3, isNaN(r4)?null:r4];
+      // Hole-by-hole scores per round (arrays of 18 stroke values)
+      const holeScores = [
+        p.round1?.scores || null,
+        p.round2?.scores || null,
+        p.round3?.scores || null,
+        p.round4?.scores || null
+      ];
       if (p.roundStatus === "Playing" && thru !== 18) anyActive = true;
-      scores[name] = { s: scoreToPar, thru, r: rounds, teeTime };
+      scores[name] = { s: scoreToPar, thru, r: rounds, teeTime, holes: holeScores };
     }
-    return { scores, tournamentName: "Masters Tournament", anyActive, golferCount: Object.keys(scores).length };
+    return { scores, tournamentName: "Masters Tournament", anyActive, golferCount: Object.keys(scores).length, coursePars };
   } catch (e) { return null; }
 }
 
@@ -840,16 +924,17 @@ function App(){
   const tiers=useMemo(()=>buildTiers(DEFAULT_ODDS),[]);
   const[tournament,setTournament]=useState({id:"2026-masters",name:"2026 Masters",status:"active",course:"Augusta National",startDate:"2026-04-09",firstTeeTime:"2026-04-09T11:40:00Z",tiersLocked:false,tiers});
   const[picks,setPicks]=useState(SAMPLE_PICKS);const[scores,setScores]=useState(SAMPLE_SCORES);const[history]=useState(SAMPLE_HISTORY);
+  const[coursePars,setCoursePars]=useState(null);
   const[lastUpdated,setLastUpdated]=useState(Date.now());
-  const[liveStatus,setLiveStatus]=useState("idle"); // idle, fetching, live, error, off
+  const[liveStatus,setLiveStatus]=useState("idle");
   const[autoRefresh,setAutoRefresh]=useState(true);
 
-  // ESPN live fetch
   const fetchLive = useCallback(async () => {
     setLiveStatus("fetching");
     const result = await fetchESPNScores();
     if (result && result.golferCount > 0) {
       setScores(result.scores);
+      if (result.coursePars) setCoursePars(result.coursePars);
       setLastUpdated(Date.now());
       setLiveStatus(result.anyActive ? "live" : "idle");
       return result.anyActive;
@@ -1122,12 +1207,34 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .lb-d{animation:expandIn .25s ease}
 @keyframes expandIn{from{opacity:0;max-height:0}to{opacity:1;max-height:500px}}
+
+/* Scorecard */
+.sb-expanded{background:var(--sa);border-bottom:1px solid var(--bd);padding:12px;animation:expandIn .25s ease;overflow-x:auto}
+.scorecard{display:flex;flex-direction:column;gap:12px}
+.sc-round-label{font-family:var(--fd);font-size:14px;color:var(--tx);margin-bottom:6px}
+.sc-grid{font-family:var(--fm);font-size:11px}
+.sc-header-row,.sc-score-row{display:grid;grid-template-columns:40px repeat(9,1fr) 36px;gap:1px;align-items:center}
+.sc-label{font-weight:600;color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.3px}
+.sc-hole-num{text-align:center;font-weight:600;color:var(--dim);font-size:10px;padding:2px 0}
+.sc-par{text-align:center;color:var(--dim);font-size:10px;padding:2px 0}
+.sc-cell{text-align:center;font-weight:700;font-size:12px;padding:0;min-width:24px;height:24px;line-height:24px;position:relative;display:inline-flex;align-items:center;justify-content:center}
+.sc-empty{color:var(--dim);opacity:.3}
+.sc-birdie{color:#059669}.sc-birdie::before{content:'';position:absolute;inset:2px;border-radius:50%;border:2px solid #059669}
+.sc-dbeagle{color:#047857}.sc-dbeagle::before{content:'';position:absolute;inset:0;border-radius:50%;border:2px solid #047857}.sc-dbeagle::after{content:'';position:absolute;inset:3px;border-radius:50%;border:1.5px solid #047857}
+.sc-par-hole{color:var(--tx)}
+.sc-bogey{color:#dc2626}.sc-bogey::before{content:'';position:absolute;inset:2px;border:2px solid #dc2626;border-radius:2px}
+.sc-dbogey{color:#b91c1c}.sc-dbogey::before{content:'';position:absolute;inset:0;border:2px solid #b91c1c;border-radius:2px}.sc-dbogey::after{content:'';position:absolute;inset:3px;border:1.5px solid #b91c1c;border-radius:1px}
+.sc-out{font-weight:700;color:var(--tx);border-left:1px solid var(--bd);padding-left:4px}
+.sc-total-row{display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid var(--bd)}
+.sc-total-val{font-weight:800;font-size:14px;color:var(--tx)}
+.sc-total-par{font-size:11px;color:var(--dim)}
+@media(max-width:500px){.sc-header-row,.sc-score-row{grid-template-columns:32px repeat(9,1fr) 32px}.sc-cell{font-size:10px;min-width:18px;padding:3px 1px}}
   `}</style>
   <div style={{maxWidth:800,margin:"0 auto",padding:"16px 16px 48px",minHeight:"100vh"}}>
     <Header view={view} setView={setView} isAdmin={isAdmin}/>
     {view==="leaderboard"&&<LeaderboardView tournament={tournament} picks={picks} scores={scores} lastUpdated={lastUpdated} onRefresh={handleRefresh} liveStatus={liveStatus} autoRefresh={autoRefresh} setAutoRefresh={setAutoRefresh}/>}
     {view==="teams"&&<TeamsView picks={picks} scores={scores}/>}
-    {view==="scoreboard"&&<ScoreboardView tournament={tournament} scores={scores} picks={picks} lastUpdated={lastUpdated} onRefresh={handleRefresh} liveStatus={liveStatus} autoRefresh={autoRefresh} setAutoRefresh={setAutoRefresh}/>}
+    {view==="scoreboard"&&<ScoreboardView tournament={tournament} scores={scores} picks={picks} lastUpdated={lastUpdated} onRefresh={handleRefresh} liveStatus={liveStatus} autoRefresh={autoRefresh} setAutoRefresh={setAutoRefresh} coursePars={coursePars}/>}
     {view==="picks"&&<PicksFormLink tournament={tournament} formUrl="https://docs.google.com/forms/d/1SRDMuVGPA6rcJVhOIObDcIwVuiYoyjiMYdmK98ryYPs/edit" picks={picks} participants={PARTICIPANTS}/>}
     {/* Future: in-app pick submission — {view==="picks"&&<PicksView tournament={tournament} tiers={tiers} existingPicks={picks} onSubmit={onPick} participants={PARTICIPANTS}/>} */}
     {view==="history"&&<HistoryView history={history}/>}
