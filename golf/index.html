@@ -560,7 +560,7 @@ function BugReportView(){
 
 // ─── ESPN LIVE SCORES FETCH ───
 // ── CHANGE THIS to your Cloudflare Worker URL after deploying ──
-const CF_WORKER_URL = "https://golf-proxy.kreaganckennedy.workers.dev/";
+const CF_WORKER_URL = "https://golf-proxy.kreaganckennedy.workers.dev";
 // ────────────────────────────────────────────────────────────────
 
 const MASTERS_URL = "https://www.masters.com/en_US/scores/feeds/2026/scores.json";
@@ -593,10 +593,19 @@ async function proxyFetch(url) {
 async function fetchESPNScores() {
   // Try Masters.com first (full field + thru data) — only works via CF Worker
   if (CF_WORKER_URL && !CF_WORKER_URL.includes("YOUR-SUBDOMAIN")) {
+    console.log("[FETCH] Trying Masters.com via CF Worker...");
     const mastersData = await proxyFetch(MASTERS_URL);
     if (mastersData) {
+      console.log("[FETCH] Masters.com response keys:", Object.keys(mastersData).join(", "));
+      console.log("[FETCH] Masters.com sample:", JSON.stringify(mastersData).substring(0, 500));
       const result = parseMastersData(mastersData);
-      if (result && result.golferCount > 0) return result;
+      if (result && result.golferCount > 0) {
+        console.log("[FETCH] Masters.com success:", result.golferCount, "golfers");
+        return result;
+      }
+      console.log("[FETCH] Masters.com parse failed, falling back to ESPN");
+    } else {
+      console.log("[FETCH] Masters.com fetch returned null, falling back to ESPN");
     }
   }
   // Fallback: ESPN merged
@@ -609,54 +618,38 @@ async function fetchESPNScores() {
 
 function parseMastersData(data) {
   try {
-    // Masters.com scores.json structure: data.player[] with full details
-    const players = data.player || data.players || data.data?.player || [];
-    if (!players.length) {
-      // Try alternate structure
-        return null;
-    }
+    const players = data.data?.player || data.player || [];
+    if (!players.length) return null;
     const scores = {};
     let anyActive = false;
     for (const p of players) {
-      const first = p.first_name || p.firstName || "";
-      const last = p.last_name || p.lastName || "";
-      const name = p.display_name || p.displayName || `${first} ${last}`.trim();
+      const name = p.full_name || ((p.first_name||"") + " " + (p.last_name||"")).trim();
       if (!name) continue;
-
       let scoreToPar = null;
-      const topar = p.topar ?? p.to_par ?? p.total ?? p.score;
-      if (topar === "E" || topar === 0 || topar === "0") scoreToPar = 0;
-      else if (topar != null) scoreToPar = parseInt(topar);
+      const tp = p.topar;
+      if (tp === "E" || tp === "0" || tp === 0) scoreToPar = 0;
+      else if (tp != null && tp !== "") scoreToPar = parseInt(tp);
       if (isNaN(scoreToPar)) scoreToPar = null;
-
-      const thruVal = p.thru ?? p.today_thru ?? p.holes;
       let thru = null;
       let teeTime = null;
-      if (thruVal === "F" || thruVal === 18 || thruVal === "18") thru = 18;
-      else if (thruVal === "-" || thruVal === "" || thruVal == null) {
-        thru = 0;
-        teeTime = p.teetime || p.tee_time || p.start_time || null;
-      } else if (typeof thruVal === "number") {
-        thru = thruVal;
-        if (thru > 0 && thru < 18) anyActive = true;
-      } else if (typeof thruVal === "string" && thruVal.match(/^\d+$/)) {
+      const thruVal = p.thru;
+      if (thruVal === "F" || thruVal === "18" || thruVal === 18) thru = 18;
+      else if (thruVal === "" || thruVal == null || thruVal === "-") {
+        thru = 0; teeTime = p.teetime || null;
+      } else if (!isNaN(parseInt(thruVal))) {
         thru = parseInt(thruVal);
         if (thru > 0 && thru < 18) anyActive = true;
-      } else if (typeof thruVal === "string" && thruVal.match(/\d+:\d+/)) {
-        thru = 0;
-        teeTime = thruVal;
       }
-
-      const r1 = p.round1 ?? p.r1 ?? p.rounds?.[0] ?? null;
-      const r2 = p.round2 ?? p.r2 ?? p.rounds?.[1] ?? null;
-      const r3 = p.round3 ?? p.r3 ?? p.rounds?.[2] ?? null;
-      const r4 = p.round4 ?? p.r4 ?? p.rounds?.[3] ?? null;
-      const rounds = [r1, r2, r3, r4].map(v => v != null && !isNaN(parseInt(v)) ? parseInt(v) : null);
-
+      const r1 = p.round1?.total != null ? parseInt(p.round1.total) : null;
+      const r2 = p.round2?.total != null ? parseInt(p.round2.total) : null;
+      const r3 = p.round3?.total != null ? parseInt(p.round3.total) : null;
+      const r4 = p.round4?.total != null ? parseInt(p.round4.total) : null;
+      const rounds = [isNaN(r1)?null:r1, isNaN(r2)?null:r2, isNaN(r3)?null:r3, isNaN(r4)?null:r4];
+      if (p.roundStatus === "Playing" && thru !== 18) anyActive = true;
       scores[name] = { s: scoreToPar, thru, r: rounds, teeTime };
     }
     return { scores, tournamentName: "Masters Tournament", anyActive, golferCount: Object.keys(scores).length };
-  } catch (e) { console.log("[MASTERS] Parse error:", e.message); return null; }
+  } catch (e) { return null; }
 }
 
 function parseESPNMerged(headerData, scoreboardData) {
