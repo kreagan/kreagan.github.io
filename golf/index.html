@@ -139,8 +139,9 @@ function Banner({tournament:t}){if(!t)return null;
 function ThruBadge({thru,teeTime}){
   if(thru===0&&teeTime)return <span className="thru-badge tee">{typeof teeTime==="string"&&teeTime.match(/\d+:\d+/)?teeTime:new Date(teeTime).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</span>;
   if(thru===0)return <span className="thru-badge">–</span>;
-  if(thru==null)return <span className="thru-badge">–</span>;
-  const done=thru>=18;return <span className={`thru-badge ${done?"done":"live"}`}>{done?"F":thru}</span>;}
+  if(thru==null)return <span className="thru-badge live">●</span>;
+  if(thru>=18)return <span className="thru-badge done">F</span>;
+  return <span className="thru-badge live">{thru}</span>;}
 
 function RoundBadges({rounds}){if(!rounds)return null;
   const box={display:"inline-flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
@@ -558,132 +559,200 @@ function BugReportView(){
     </div></div>;}
 
 // ─── ESPN LIVE SCORES FETCH ───
-const ESPN_GOLF_URL = "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard";
+const ESPN_HEADER_URL = "https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=golf&league=pga";
+const ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard";
 const CORS_PROXIES = [
   url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
 ];
 
-async function fetchESPNScores() {
+async function proxyFetch(url) {
   for (const makeUrl of CORS_PROXIES) {
     try {
-      const proxyUrl = makeUrl(ESPN_GOLF_URL);
-      console.log("[ESPN] Trying:", proxyUrl.substring(0, 60) + "...");
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) { console.log("[ESPN] HTTP error:", res.status); continue; }
-      const data = await res.json();
-      console.log("[ESPN] Got data, events:", data.events?.length, "leagues:", data.leagues?.length);
-      const result = parseESPNData(data);
-      if (result && result.golferCount > 0) {
-        console.log("[ESPN] Parsed", result.golferCount, "golfers, active:", result.anyActive);
-        return result;
+      const res = await fetch(makeUrl(url), { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) continue;
+      return await res.json();
+    } catch (e) { continue; }
+  }
+  return null;
+}
+
+async function fetchESPNScores() {
+  console.log("[ESPN] Fetching both endpoints...");
+  // Fetch both in parallel
+  const [headerData, scoreboardData] = await Promise.all([
+    proxyFetch(ESPN_HEADER_URL),
+    proxyFetch(ESPN_SCOREBOARD_URL)
+  ]);
+
+  // Parse header (top 25 with rich thru/teeTime data)
+  let headerScores = {};
+  let headerNames = new Set();
+  let tournamentName = "Tournament";
+  let anyActive = false;
+
+  if (headerData?.sports) {
+    const event = headerData.sports[0]?.leagues?.[0]?.events?.[0];
+    if (event) {
+      tournamentName = event.name || "Tournament";
+      for (const c of (event.competitors || [])) {
+        const name = c.name || c.displayName;
+        if (!name) continue;
+        // Handle "E" for even par
+        let scoreToPar = null;
+        if (c.score === "E" || c.score === "0") scoreToPar = 0;
+        else if (c.score != null && c.score !== "") scoreToPar = parseInt(c.score);
+        if (isNaN(scoreToPar)) scoreToPar = null;
+
+        const st = c.status || {};
+        let thru = 18, teeTime = null;
+        if (st.state === "pre") {
+          thru = 0;
+          teeTime = st.teeTime || null;
+          if (teeTime && teeTime.match(/^\d{4}-/)) try { teeTime = new Date(teeTime).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}); } catch(e) {}
+          if (!teeTime && st.displayValue?.match(/\d+:\d+/)) teeTime = st.displayValue.replace(/\s*ET$/i,"").trim();
+        } else if (st.state === "in") {
+          thru = st.hole || parseInt((st.displayValue?.match(/(\d+)/) || [])[1]) || null;
+          anyActive = true;
+        } else { thru = 18; }
+        const rounds = (c.linescores || []).map(ls => { const v = typeof ls === "object" ? ls.value : ls; return v != null ? parseInt(v) : null; });
+        while (rounds.length < 4) rounds.push(null);
+        headerScores[name] = { s: scoreToPar, thru, r: rounds, teeTime };
+        headerNames.add(name);
       }
-      console.log("[ESPN] Parse returned no golfers, trying next proxy");
-    } catch (e) { console.log("[ESPN] Fetch error:", e.message); continue; }
+    }
+    console.log("[ESPN] Header: parsed", Object.keys(headerScores).length, "golfers");
+  }
+
+  // Parse scoreboard (full field of 91 but no thru/teeTime)
+  let fullScores = {};
+  if (scoreboardData?.events) {
+    const event = scoreboardData.events[0];
+    if (!tournamentName || tournamentName === "Tournament") tournamentName = event?.name || "Tournament";
+    const competition = event?.competitions?.[0];
+    for (const c of (competition?.competitors || [])) {
+      const name = c.athlete?.displayName || c.athlete?.shortName;
+      if (!name) continue;
+      // Handle "E" for even par
+      let scoreToPar = null;
+      if (c.score === "E" || c.score === "0" || c.score === 0) scoreToPar = 0;
+      else if (c.score != null && c.score !== "") scoreToPar = parseInt(c.score);
+      if (isNaN(scoreToPar)) scoreToPar = null;
+
+      const rounds = (c.linescores || []).map(ls => ls.value != null ? parseInt(ls.value) : null);
+      while (rounds.length < 4) rounds.push(null);
+      // For scoreboard-only players: use null for thru (shows "–") since we don't know their actual status
+      // Only players in the header get accurate thru values
+      fullScores[name] = { s: scoreToPar, thru: scoreToPar != null ? null : 0, r: rounds, teeTime: null };
+    }
+    console.log("[ESPN] Scoreboard: parsed", Object.keys(fullScores).length, "golfers");
+  }
+
+  // Merge: start with full scoreboard, then overlay header data (which has better thru/teeTime)
+  const merged = { ...fullScores };
+  for (const [name, data] of Object.entries(headerScores)) {
+    merged[name] = data; // header data overwrites with richer info
+  }
+
+  const golferCount = Object.keys(merged).length;
+  console.log("[ESPN] Merged:", golferCount, "golfers, active:", anyActive);
+
+  if (golferCount > 0) {
+    return { scores: merged, tournamentName, anyActive, golferCount };
   }
   return null;
 }
 
 function parseESPNData(data) {
   try {
-    const events = data.events || [];
-    if (!events.length) { console.log("[ESPN] No events in response"); return null; }
-    const event = events[0];
-    console.log("[ESPN] Event:", event.name, "status:", event.status?.type?.description);
+    // The header endpoint returns data.sports[0].leagues[0].events[0]
+    // The scoreboard endpoint returns data.events[0]
+    let event = null;
+    let competitors = [];
 
-    // ESPN golf uses competitions[0].competitors for the leaderboard
-    const competition = event.competitions?.[0];
-    const competitors = competition?.competitors || [];
-    console.log("[ESPN] Competitors found:", competitors.length);
+    if (data.sports) {
+      const league = data.sports?.[0]?.leagues?.[0];
+      event = league?.events?.[0];
+      competitors = event?.competitors || [];
+      console.log("[ESPN] Header format — event:", event?.name, "competitors:", competitors.length);
+      if (competitors.length > 0) console.log("[ESPN DEBUG header[0]]", JSON.stringify(competitors[0]).substring(0, 600));
+    } else if (data.events) {
+      event = data.events[0];
+      const competition = event?.competitions?.[0];
+      competitors = competition?.competitors || [];
+      console.log("[ESPN] Scoreboard format — event:", event?.name, "competitors:", competitors.length);
+      if (competitors.length > 0) console.log("[ESPN DEBUG scoreboard[0]]", JSON.stringify(competitors[0]).substring(0, 600));
+    }
+
+    if (!event || !competitors.length) return null;
 
     const scores = {};
     let anyActive = false;
 
     for (const c of competitors) {
-      // Name can be in different places
-      const name = c.athlete?.displayName || c.athlete?.fullName || c.athlete?.shortName || c.athlete?.name;
+      const name = c.name || c.displayName || c.athlete?.displayName;
       if (!name) continue;
 
-      // Score to par — ESPN uses different field names
       let scoreToPar = null;
       if (c.score != null && c.score !== "") scoreToPar = parseInt(c.score);
-      else if (c.statistics) {
-        const parStat = c.statistics.find(s => s.name === "scoreToPar" || s.name === "relativeScore");
-        if (parStat) scoreToPar = parseInt(parStat.value);
-      }
 
-      // Status — ESPN golf status structure
-      const status = c.status || {};
-      const statusType = status.type?.name || status.type?.description || "";
-      const statusDesc = status.type?.description || "";
-      const displayValue = status.displayValue || "";
-      const period = status.period || 0; // This is the ROUND number (1-4), not hole
-
-      // Determine thru (hole number in current round)
-      let hole = null;
+      // Status — header endpoint has c.status as a flat object with:
+      //   .displayValue ("Thru 8", "F", "1:44 PM ET")
+      //   .hole (8)
+      //   .name ("STATUS_IN_PROGRESS", "STATUS_FINAL", "STATUS_SCHEDULED")
+      //   .state ("in", "post", "pre")
+      //   .teeTime ("2026-04-09T12:02Z")
+      //   .detail ("-2(8)")
+      let thru = 18;
       let teeTime = null;
+      const st = c.status || {};
+      const stName = st.name || st.type?.name || "";
+      const stState = st.state || "";
+      const stDisplay = st.displayValue || "";
+      const stHole = st.hole;
 
-      if (statusType === "STATUS_FINAL" || statusDesc === "Final" || displayValue === "F") {
-        hole = 18;
-      } else if (statusType === "STATUS_CUT" || statusDesc === "Cut" || statusDesc === "MDF" || statusDesc === "WD" || statusDesc === "DQ") {
-        hole = 18;
-      } else if (statusType === "STATUS_SCHEDULED" || statusType === "STATUS_PRE_EVENT" || statusDesc === "Scheduled") {
-        // Player hasn't started — try to get tee time
-        hole = 0;
-        teeTime = status.startDate || status.teeTime || c.startDate || null;
-        // Also check displayValue for time like "1:44 PM"
-        if (!teeTime && displayValue && displayValue.match(/\d+:\d+/)) {
-          teeTime = displayValue;
-        }
-      } else if (statusType === "STATUS_IN_PROGRESS" || statusDesc === "In Progress") {
-        // Active on course — displayValue often shows hole number like "Thru 7" or just "7"
-        if (displayValue) {
-          const thruMatch = displayValue.match(/(\d+)/);
-          if (thruMatch) hole = parseInt(thruMatch[1]);
-        }
-        if (!hole && status.thru) hole = parseInt(status.thru);
-        if (!hole) hole = null; // truly unknown, show as in-progress
+      if (stState === "pre" || stName === "STATUS_SCHEDULED") {
+        thru = 0;
+        teeTime = st.teeTime || st.startDate || null;
+        if (!teeTime && stDisplay.match(/\d+:\d+/)) teeTime = stDisplay.replace(/\s*ET$/i,"").trim();
+      } else if (stState === "in" || stName === "STATUS_IN_PROGRESS") {
+        thru = stHole || parseInt((stDisplay.match(/(\d+)/) || [])[1]) || null;
         anyActive = true;
-      } else {
-        // Fallback — try to parse displayValue
-        if (displayValue === "F") hole = 18;
-        else if (displayValue.match(/^\d+$/)) hole = parseInt(displayValue);
-        else if (displayValue.match(/\d+:\d+/)) { hole = 0; teeTime = displayValue; }
-        else if (status.thru) hole = parseInt(status.thru);
-        else hole = 18; // default finished if has score
+      } else if (stState === "post" || stName === "STATUS_FINAL") {
+        thru = 18;
+      } else if (stDisplay === "F" || stDisplay === "Final") {
+        thru = 18;
+      } else if (stDisplay === "Cut" || stDisplay === "WD" || stDisplay === "DQ" || stDisplay === "MDF") {
+        thru = 18;
+      } else if (stDisplay.match(/Thru\s*(\d+)/i)) {
+        thru = parseInt(stDisplay.match(/(\d+)/)[1]);
+        anyActive = true;
+      } else if (stDisplay.match(/\d+:\d+/)) {
+        thru = 0;
+        teeTime = stDisplay.replace(/\s*ET$/i,"").trim();
+      } else if (scoreToPar == null) {
+        thru = 0;
       }
 
-      if (hole && hole > 0 && hole < 18) anyActive = true;
-
-      // Round scores from linescores
-      const rounds = (c.linescores || []).map(ls => {
-        const v = ls.value != null ? parseInt(ls.value) : null;
-        return (v && !isNaN(v)) ? v : null;
+      // Rounds from linescores
+      const rawLinescores = c.linescores || [];
+      const rounds = rawLinescores.map(ls => {
+        const v = (typeof ls === "object" ? ls.value : ls);
+        return (v != null && !isNaN(parseInt(v))) ? parseInt(v) : null;
       });
       while (rounds.length < 4) rounds.push(null);
 
-      // Store all players — even those without scores yet (tee times)
-      if (scoreToPar != null && !isNaN(scoreToPar)) {
-        scores[name] = { s: scoreToPar, thru: hole, r: rounds, teeTime };
-      } else if (hole === 0 && teeTime) {
-        // Player hasn't started — store with null score so they appear on scoreboard
-        scores[name] = { s: null, thru: 0, r: rounds, teeTime };
+      // Format teeTime for display if it's an ISO string
+      if (teeTime && teeTime.match(/^\d{4}-/)) {
+        try { teeTime = new Date(teeTime).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}); } catch(e) {}
       }
-    }
 
-    // If no competitors found via normal path, try alternate ESPN structure
-    if (Object.keys(scores).length === 0 && event.competitions) {
-      console.log("[ESPN] Trying alternate parse — checking all competitions");
-      for (const comp of event.competitions) {
-        const alts = comp.competitors || comp.entries || [];
-        for (const c of alts) {
-          const name = c.athlete?.displayName || c.team?.displayName;
-          const sc = c.score != null ? parseInt(c.score) : null;
-          if (name && sc != null && !isNaN(sc)) {
-            scores[name] = { s: sc, thru: 18, r: [null,null,null,null] };
-          }
-        }
+      // Store ALL players
+      if (scoreToPar != null && !isNaN(scoreToPar)) {
+        scores[name] = { s: scoreToPar, thru, r: rounds, teeTime };
+      } else {
+        scores[name] = { s: null, thru: 0, r: rounds, teeTime };
       }
     }
 
