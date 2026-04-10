@@ -192,18 +192,24 @@ function RoundBadges({rounds}){if(!rounds)return null;
 
 function RefreshTimer({lastUpdated,onRefresh,liveStatus,autoRefresh,setAutoRefresh}){
   const[ago,setAgo]=useState("");
+  const[refreshing,setRefreshing]=useState(false);
   useEffect(()=>{const tick=()=>{if(!lastUpdated){setAgo("never");return;}
     const d=Math.floor((Date.now()-lastUpdated)/1000);
     if(d<60)setAgo(`${d}s ago`);else if(d<3600)setAgo(`${Math.floor(d/60)}m ago`);else setAgo(`${Math.floor(d/3600)}h ago`);};
     tick();const iv=setInterval(tick,5000);return()=>clearInterval(iv);},[lastUpdated]);
+  useEffect(()=>{if(liveStatus!=="fetching")setRefreshing(false);},[liveStatus]);
   const dotCls=liveStatus==="live"?"live-dot pulse":liveStatus==="fetching"?"live-dot fetch":liveStatus==="error"?"live-dot err":"live-dot off";
-  const stxt=liveStatus==="live"?"Live":liveStatus==="fetching"?"...":liveStatus==="error"?"ESPN down":liveStatus==="off"?"Off":"Idle";
-  return <div className="refresh-bar">
-    <span className={dotCls}/><span className="refresh-text">{stxt} · {ago}</span>
-    <div style={{flex:1}}/>
-    {setAutoRefresh&&<label className="auto-toggle"><input type="checkbox" checked={autoRefresh} onChange={e=>setAutoRefresh(e.target.checked)} style={{marginRight:3}}/>
-      <span style={{fontSize:10}}>Auto</span></label>}
-    <button onClick={onRefresh} className="refresh-btn">{"\u21BB"}</button>
+  const stxt=liveStatus==="live"?"Live":liveStatus==="fetching"?"Updating...":liveStatus==="error"?"Connection error":liveStatus==="off"?"Paused":"Idle";
+  const doRefresh=()=>{setRefreshing(true);onRefresh();};
+  return <div className="refresh-bar" onClick={doRefresh} style={{cursor:"pointer"}}>
+    <div className="refresh-left">
+      <span className={dotCls}/><span className="refresh-text">{stxt} · {ago}</span>
+    </div>
+    <div className="refresh-right">
+      {setAutoRefresh&&<label className="auto-toggle" onClick={e=>e.stopPropagation()}><input type="checkbox" checked={autoRefresh} onChange={e=>setAutoRefresh(e.target.checked)} style={{marginRight:3}}/>
+        <span style={{fontSize:12}}>Auto</span></label>}
+      <button onClick={e=>{e.stopPropagation();doRefresh();}} className={`refresh-btn ${refreshing?"spinning":""}`}>{"\u21BB"}</button>
+    </div>
   </div>;}
 
 function Countdown({targetDate}){
@@ -868,7 +874,6 @@ function App(){
   const[picks,setPicks]=useState(PICKS_2026);const[scores,setScores]=useState({});const[history]=useState(POOL_HISTORY);
   const[coursePars,setCoursePars]=useState(null);
   const[prevPositions,setPrevPositions]=useState({});
-  const[pullY,setPullY]=useState(0);const[pulling,setPulling]=useState(false);
   const[lastUpdated,setLastUpdated]=useState(Date.now());
   const[liveStatus,setLiveStatus]=useState("idle");
   const[autoRefresh,setAutoRefresh]=useState(true);
@@ -916,21 +921,6 @@ function App(){
   useEffect(()=>{let b="";const h=e=>{b=(b+e.key).slice(-10);if(b.includes("admin")){setIsAdmin(true);setView("admin");b="";}};
     window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
   const onPick=useCallback(s=>setPicks(p=>({...p,[s.name]:s})),[]);
-
-  // Pull to refresh
-  const touchStartY = React.useRef(0);
-  const onTouchStart = useCallback(e => {
-    if (window.scrollY === 0) touchStartY.current = e.touches[0].clientY;
-  }, []);
-  const onTouchMove = useCallback(e => {
-    if (touchStartY.current === 0) return;
-    const dy = e.touches[0].clientY - touchStartY.current;
-    if (dy > 0 && window.scrollY === 0) { setPullY(Math.min(dy * 0.4, 80)); setPulling(true); }
-  }, []);
-  const onTouchEnd = useCallback(() => {
-    if (pullY > 50) fetchLive();
-    setPullY(0); setPulling(false); touchStartY.current = 0;
-  }, [pullY, fetchLive]);
 
   return (
     <><style>{`
@@ -1007,18 +997,24 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
 .hide-mobile{display:block}@media(max-width:500px){.hide-mobile{display:none}}
 .hide-mobile-sm{display:block}@media(max-width:600px){.hide-mobile-sm{display:none}}
 
-.refresh-bar{display:flex;align-items:center;padding:8px 14px;background:var(--card);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
-  border:1px solid var(--bd);border-radius:var(--r-sm);margin-bottom:14px;font-size:12px;color:var(--dim);font-family:var(--fm);gap:8px;box-shadow:var(--shadow)}
-.refresh-text{display:flex;align-items:center;gap:5px}
-.refresh-btn{background:none;border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:14px;
-  font-family:var(--fm);color:var(--gd);cursor:pointer;font-weight:600;transition:all .15s;line-height:1;min-width:44px;min-height:36px;
+.refresh-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--card);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--bd);border-radius:var(--r-sm);margin-bottom:14px;font-size:12px;color:var(--dim);font-family:var(--fm);gap:8px;box-shadow:var(--shadow);min-height:48px;
+  transition:background .15s;-webkit-tap-highlight-color:transparent}
+.refresh-bar:active{background:var(--gl)}
+.refresh-left{display:flex;align-items:center;gap:8px}
+.refresh-right{display:flex;align-items:center;gap:10px}
+.refresh-text{display:flex;align-items:center;gap:5px;font-size:13px}
+.refresh-btn{background:none;border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:16px;
+  font-family:var(--fm);color:var(--gd);cursor:pointer;font-weight:600;transition:all .15s;line-height:1;min-width:44px;min-height:40px;
   display:flex;align-items:center;justify-content:center}
 .refresh-btn:hover{background:var(--gl);border-color:var(--gd)}.refresh-btn:active{transform:scale(.93)}
-.live-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.refresh-btn.spinning{animation:spin .6s ease}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.live-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .live-dot.pulse{background:#22c55e;animation:pulse-dot 1.5s ease-in-out infinite}
 .live-dot.fetch{background:#f59e0b}.live-dot.err{background:#ef4444}.live-dot.off{background:var(--dim);opacity:.4}
 @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
-.auto-toggle{display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:var(--dim);font-family:var(--fm)}
+.auto-toggle{display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:var(--dim);font-family:var(--fm)}
 
 .countdown{display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--gl);border:1px solid var(--gd);
   border-radius:var(--r-sm);margin-bottom:16px;font-size:14px;flex-wrap:wrap}
@@ -1199,9 +1195,6 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
 @media(max-width:500px){.sc-header-row,.sc-score-row{grid-template-columns:32px repeat(9,1fr) 32px}.sc-cell{font-size:10px;min-width:18px;padding:3px 1px}}
 
 /* Pull to refresh */
-.pull-indicator{display:flex;align-items:center;justify-content:center;gap:8px;overflow:hidden;transition:opacity .2s}
-.pull-icon{font-size:20px;transition:transform .3s}.pull-icon.ready{transform:rotate(180deg)}
-.pull-text{font-size:12px;color:var(--dim);font-family:var(--fm)}
 
 /* Movement arrows */
 .mv{font-size:9px;display:block;line-height:1;margin-top:1px;font-family:var(--fm)}
