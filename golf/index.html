@@ -2,23 +2,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#15803d" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<title>K&M Major Pool ⛳</title>
-<meta property="og:title" content="K&M Major Pool ⛳">
-<meta property="og:description" content="Live leaderboard for the 2026 Masters golf pool">
-<meta property="og:image" content="https://kreagan.github.io/static/css/img/nuble.jpg">
-<meta property="og:url" content="https://kreagan.com/golf/">
-<meta property="og:type" content="website">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="K&M Major Pool ⛳">
-<meta name="twitter:description" content="Live leaderboard for the 2026 Masters golf pool">
-<meta name="twitter:image" content="https://kreagan.github.io/static/css/img/nuble.jpg">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>K&M Major Pool</title>
+<meta property="og:title" content="K&M Major Pool"/>
+<meta property="og:description" content="Live leaderboard for K&M Major Pool – best 4 of 7 picks across tiers"/>
+<meta property="og:image" content="https://kreagan.github.io/static/css/img/nuble.jpg"/>
+<meta property="og:type" content="website"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
@@ -26,7 +16,7 @@
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState, useEffect, useCallback, useMemo} = React;
+const { useState, useEffect, useCallback, useMemo } = React;
 
 const PARTICIPANTS = ["Kreag","Teej","Fjord","Farthead","Tony","Christian","Timmy","Dirk","Doug","Nate","Condel$","Willie","Nuble","Polaris","SOD"];
 
@@ -94,12 +84,57 @@ const POOL_HISTORY = [
   {id:"2022-bo",name:"2022 British Open",venue:"St Andrews",status:"completed",champ:"Cameron Smith",champScore:-20,poolWinner:"Kreag",poolScore:-56,participants:["Polaris","Kreag","Nuble","Dirk","Farthead","Nate","Timmy","Fjord","Teej"]},
   {id:"2022-us",name:"2022 US Open",venue:"The Country Club",status:"completed",champ:"Matt Fitzpatrick",champScore:-6,poolWinner:"Nate",poolScore:-11,participants:["Polaris","Nate","Timmy","Nuble","Dirk","Teej","Farthead","Kreag"]},
   {id:"2022-pga",name:"2022 PGA Championship",venue:"Southern Hills",status:"completed",champ:"Justin Thomas",champScore:-5,poolWinner:"Fjord",poolScore:-8,participants:["Dirk","Kreag","Timmy","Nuble","Fjord","Teej","Farthead","Nate","Polaris"]},
-  {id:"2022-m",name:"2022 Masters",venue:"Augusta National",status:"missing",champ:"Scottie Scheffler",champScore:-10,poolWinner:null,poolScore:null,participants:[]},
+  {id:"2022-m",name:"2022 Masters",venue:"Augusta National",status:"completed",champ:"Scottie Scheffler",champScore:-10,poolWinner:"Nate",poolScore:-7,participants:["Nate","Farthead","Kreag","Tony","Polaris","Nuble","Fjord","Timmy","Teej","Dirk","SOD"]},
   {id:"2021-bo",name:"2021 British Open",venue:"Royal St George's",status:"completed",champ:"Collin Morikawa",champScore:-15,poolWinner:"Nuble",poolScore:-32,participants:["Polaris","Kreag","Dirk","Teej","Nuble","SOD","Fjord","Farthead","Timmy"]},
   {id:"2021-us",name:"2021 US Open",venue:"Torrey Pines",status:"completed",champ:"Jon Rahm",champScore:-6,poolWinner:"Teej",poolScore:-4,participants:["Dirk","Kreag","Fjord","Polaris","Timmy","Teej","Nate","Tony","Farthead","Nuble"]},
   {id:"2021-pga",name:"2021 PGA Championship",venue:"Kiawah Island",status:"completed",champ:"Phil Mickelson",champScore:-6,poolWinner:"Farthead",poolScore:-4,participants:["Polaris","Dirk","Teej","SOD","Timmy","Nate","Nuble","Farthead","Tony"]},
   {id:"2021-m",name:"2021 Masters",venue:"Augusta National",status:"completed",champ:"Hideki Matsuyama",champScore:-10,poolWinner:"Fjord",poolScore:-15,participants:["Polaris","Doug","SOD","Dirk","Teej","Nate","Farthead","Tony","Nuble","Kreag","Fjord","Timmy"]},
+  {id:"2020-m",name:"2020 Masters",venue:"Augusta National",status:"completed",champ:"Dustin Johnson",champScore:-20,poolWinner:"Christian",poolScore:-49,participants:["Christian","Kreag","Doug","Farthead","Timmy","Teej","Polaris","Nate","Fjord","SOD","Tony","Dirk","Nuble"]},
+  {id:"2020-us",name:"2020 US Open",venue:"Winged Foot",status:"completed",champ:"Bryson DeChambeau",champScore:-6,poolWinner:"Fjord",poolScore:21,participants:["Fjord","Timmy","Nuble","Teej","Tony","Dirk","Kreag","Nate","Farthead","Polaris","Christian"]},
+  {id:"2020-pga",name:"2020 PGA Championship",venue:"TPC Harding Park",status:"completed",champ:"Collin Morikawa",champScore:-13,poolWinner:"Farthead",poolScore:-40,participants:["Farthead","Timmy","Dirk","Kreag","Teej","SOD","Tony","Christian","Polaris","Nuble"]},
+  {id:"2020-bo",name:"2020 British Open",venue:"N/A",status:"cancelled",champ:null,champScore:null,poolWinner:null,poolScore:null,participants:[]},
+  {id:"2019-bo",name:"2019 British Open",venue:"Royal Portrush",status:"completed",champ:"Shane Lowry",champScore:-15,poolWinner:"Timmy",poolScore:-28,participants:["Timmy","Nuble","Tony","Teej","Polaris","Fjord"]},
+  {id:"2019-us",name:"2019 US Open",venue:"Pebble Beach",status:"completed",champ:"Gary Woodland",champScore:-13,poolWinner:"Christian",poolScore:-21,participants:["Christian","Dirk","Nuble","Kreag","Timmy","Teej","Farthead","Polaris"]},
+  {id:"2019-pga",name:"2019 PGA Championship",venue:"Bethpage Black",status:"completed",champ:"Brooks Koepka",champScore:-8,poolWinner:"Polaris",poolScore:-9,participants:["Polaris","Tony","Kreag","Fjord","Timmy","Farthead","Teej","Dirk","Christian","Nuble"]},
+  {id:"2019-m",name:"2019 Masters",venue:"Augusta National",status:"completed",champ:"Tiger Woods",champScore:-13,poolWinner:"Timmy",poolScore:-41,participants:["Timmy","Dirk","Tony","Nate","Nuble","Christian","SOD","Kreag","Teej","Fjord","Polaris"]},
+  {id:"2018-pga",name:"2018 PGA Championship",venue:"Bellerive",status:"completed",champ:"Brooks Koepka",champScore:-16,poolWinner:"Doug",poolScore:-32,participants:["Doug","Christian","Teej","Dirk","Kreag","Fjord","Farthead","Timmy","Polaris","Tony"]},
+  {id:"2018-bo",name:"2018 British Open",venue:"Carnoustie",status:"completed",champ:"Francesco Molinari",champScore:-8,poolWinner:"Dirk",poolScore:-4,participants:["Dirk","Kreag","Polaris","Timmy","Nuble","Christian","Farthead","Teej"]},
+  {id:"2018-us",name:"2018 US Open",venue:"Shinnecock Hills",status:"completed",champ:"Brooks Koepka",champScore:1,poolWinner:"Timmy",poolScore:20,participants:["Timmy","Farthead","Teej","Nuble","Dirk","Kreag","Polaris","Doug"]},
+  {id:"2018-m",name:"2018 Masters",venue:"Augusta National",status:"completed",champ:"Patrick Reed",champScore:-15,poolWinner:"Dirk",poolScore:-35,participants:["Dirk","Kreag","Fjord","Doug","Tony","Teej","Christian","Nuble","SOD","Nate","Farthead","Timmy","Polaris"]},
+  {id:"2017-bo",name:"2017 British Open",venue:"Royal Birkdale",status:"completed",champ:"Jordan Spieth",champScore:-12,poolWinner:"Tony",poolScore:-18,participants:["Tony","Nuble","Farthead","Christian","Teej","Timmy","Polaris","Dirk","Kreag","Doug"]},
+  {id:"2017-us",name:"2017 US Open",venue:"Erin Hills",status:"completed",champ:"Brooks Koepka",champScore:-16,poolWinner:"Dirk",poolScore:-39,participants:["Dirk","Christian","Tony","Kreag","Teej","Farthead","Nate","Doug","SOD","Fjord","Polaris","Timmy"]},
+  {id:"2017-pga",name:"2017 PGA Championship",venue:"Quail Hollow",status:"missing",champ:"Justin Thomas",champScore:-8,poolWinner:null,poolScore:null,participants:[]},
+  {id:"2017-m",name:"2017 Masters",venue:"Augusta National",status:"completed",champ:"Sergio Garcia",champScore:-9,poolWinner:"Polaris",poolScore:-13,participants:["Polaris","Tony","Teej","Dirk","Nate","Farthead","Nuble","Christian","Timmy","Doug","Fjord","Kreag","SOD"]},
 ];
+
+// Detailed results for tournaments with verified data (name, best-4 score, tiebreaker)
+const POOL_RESULTS = {
+  "2017-m": [{n:"Polaris",s:-13,tb:-10},{n:"Tony",s:-10,tb:-13},{n:"Teej",s:-9,tb:-8},{n:"Dirk",s:-7,tb:-11},{n:"Nate",s:-6,tb:-11},{n:"Farthead",s:-6,tb:-11},{n:"Nuble",s:-5,tb:-12},{n:"Christian",s:-5,tb:-13},{n:"Timmy",s:-4,tb:-9},{n:"Doug",s:0,tb:-10},{n:"Fjord",s:1,tb:-12},{n:"Kreag",s:5,tb:-9},{n:"SOD",s:9,tb:-8}],
+  "2017-us": [{n:"Dirk",s:-39,tb:-6},{n:"Christian",s:-37,tb:-14},{n:"Tony",s:-34,tb:-4},{n:"Kreag",s:-26,tb:-9},{n:"Teej",s:-25,tb:-8},{n:"Farthead",s:-22,tb:-9},{n:"Nate",s:-21,tb:-10},{n:"Doug",s:-19,tb:-8},{n:"SOD",s:-9,tb:-8},{n:"Fjord",s:-7,tb:-7},{n:"Polaris",s:0,tb:-8},{n:"Timmy",s:11,tb:-10}],
+  "2017-bo": [{n:"Tony",s:-18,tb:-13},{n:"Nuble",s:-16,tb:-10},{n:"Farthead",s:-13,tb:-14},{n:"Christian",s:-6,tb:-14},{n:"Teej",s:-5,tb:-6},{n:"Timmy",s:-4,tb:-16},{n:"Polaris",s:-1,tb:-6},{n:"Dirk",s:8,tb:-6},{n:"Kreag",s:13,tb:0},{n:"Doug",s:null,tb:-4}],
+  "2018-m": [{n:"Dirk",s:-35,tb:-14},{n:"Kreag",s:-35,tb:-13},{n:"Fjord",s:-35,tb:-12},{n:"Doug",s:-35,tb:-6},{n:"Tony",s:-30,tb:-13},{n:"Teej",s:-27,tb:-10},{n:"Christian",s:-25,tb:-16},{n:"Nuble",s:-25,tb:-14},{n:"SOD",s:-25,tb:-10},{n:"Nate",s:-17,tb:-10},{n:"Farthead",s:-16,tb:-11},{n:"Timmy",s:-13,tb:-12},{n:"Polaris",s:-13,tb:-10}],
+  "2018-us": [{n:"Timmy",s:20,tb:-4},{n:"Farthead",s:21,tb:-7},{n:"Teej",s:24,tb:-10},{n:"Nuble",s:25,tb:-12},{n:"Dirk",s:26,tb:-7},{n:"Kreag",s:29,tb:-8},{n:"Polaris",s:29,tb:-12},{n:"Doug",s:33,tb:-4}],
+  "2018-bo": [{n:"Dirk",s:-4,tb:-5},{n:"Kreag",s:-2,tb:-11},{n:"Polaris",s:-1,tb:-9},{n:"Timmy",s:-1,tb:-99},{n:"Nuble",s:5,tb:-6},{n:"Christian",s:6,tb:-16},{n:"Farthead",s:8,tb:-6},{n:"Teej",s:10,tb:-16}],
+  "2018-pga": [{n:"Doug",s:-32,tb:-17},{n:"Christian",s:-26,tb:-12},{n:"Teej",s:-25,tb:-16},{n:"Dirk",s:-23,tb:-14},{n:"Kreag",s:-22,tb:-13},{n:"Fjord",s:-21,tb:-15},{n:"Farthead",s:-19,tb:-17},{n:"Timmy",s:-16,tb:-9},{n:"Polaris",s:-11,tb:-16},{n:"Tony",s:-11,tb:-10}],
+  "2019-m": [{n:"Timmy",s:-41,tb:-15},{n:"Dirk",s:-38,tb:-15},{n:"Tony",s:-38,tb:-10},{n:"Nate",s:-37,tb:-11},{n:"Nuble",s:-36,tb:-9},{n:"Christian",s:-34,tb:-11},{n:"SOD",s:-31,tb:-12},{n:"Kreag",s:-30,tb:-14},{n:"Teej",s:-26,tb:-11},{n:"Fjord",s:-22,tb:-10},{n:"Polaris",s:-16,tb:-14}],
+  "2019-pga": [{n:"Polaris",s:-9,tb:-13},{n:"Tony",s:-5,tb:-12},{n:"Kreag",s:-1,tb:-9},{n:"Fjord",s:-1,tb:-6},{n:"Timmy",s:3,tb:-11},{n:"Farthead",s:8,tb:-11},{n:"Teej",s:8,tb:-14},{n:"Dirk",s:12,tb:-14},{n:"Christian",s:15,tb:-16},{n:"Nuble",s:20,tb:-13}],
+  "2019-us": [{n:"Christian",s:-21,tb:-13},{n:"Dirk",s:-18,tb:-13},{n:"Nuble",s:-18,tb:-13},{n:"Kreag",s:-18,tb:-12},{n:"Timmy",s:-15,tb:-19},{n:"Teej",s:-13,tb:-12},{n:"Farthead",s:-9,tb:-10},{n:"Polaris",s:-1,tb:-6}],
+  "2019-bo": [{n:"Timmy",s:-28,tb:-9},{n:"Nuble",s:-17,tb:-12},{n:"Tony",s:-17,tb:-11},{n:"Teej",s:-11,tb:-12},{n:"Polaris",s:-5,tb:-11},{n:"Fjord",s:-2,tb:-11}],
+  "2020-pga": [{n:"Farthead",s:-40,tb:-11},{n:"Timmy",s:-38,tb:-11},{n:"Dirk",s:-38,tb:-17},{n:"Kreag",s:-36,tb:-14},{n:"Teej",s:-26,tb:-12},{n:"SOD",s:-25,tb:-9},{n:"Tony",s:-24,tb:-10},{n:"Christian",s:-18,tb:-19},{n:"Polaris",s:-10,tb:-15},{n:"Nuble",s:-8,tb:-12}],
+  "2020-us": [{n:"Fjord",s:21,tb:-5},{n:"Timmy",s:23,tb:-8},{n:"Nuble",s:26,tb:-5},{n:"Teej",s:29,tb:-4},{n:"Tony",s:30,tb:-9},{n:"Dirk",s:31,tb:-7},{n:"Kreag",s:31,tb:-11},{n:"Nate",s:31,tb:4},{n:"Farthead",s:34,tb:2},{n:"Polaris",s:46,tb:-9},{n:"Christian",s:null,tb:-6}],
+  "2020-m": [{n:"Christian",s:-49,tb:-13},{n:"Kreag",s:-49,tb:-10},{n:"Doug",s:-47,tb:-13},{n:"Farthead",s:-46,tb:-11},{n:"Timmy",s:-46,tb:-9},{n:"Teej",s:-41,tb:-12},{n:"Polaris",s:-40,tb:-14},{n:"Nate",s:-40,tb:-10},{n:"Fjord",s:-36,tb:-15},{n:"SOD",s:-32,tb:-12},{n:"Tony",s:-31,tb:-8},{n:"Dirk",s:-30,tb:-16},{n:"Nuble",s:-19,tb:-12}],
+  "2022-m": [{n:"Nate",s:-7,tb:-10},{n:"Farthead",s:-7,tb:-14},{n:"Kreag",s:-7,tb:-17},{n:"Tony",s:-6,tb:-10},{n:"Polaris",s:-3,tb:-6},{n:"Nuble",s:-3,tb:-14},{n:"Fjord",s:-1,tb:-8},{n:"Timmy",s:0,tb:-14},{n:"Teej",s:3,tb:-9},{n:"Dirk",s:6,tb:-16},{n:"SOD",s:8,tb:-11}],
+  "2021-us": [{n:"Teej",s:-8,tb:-5},{n:"Nate",s:-7,tb:-4},{n:"Dirk",s:-3,tb:-6},{n:"Timmy",s:-3,tb:-6},{n:"Farthead",s:-3,tb:-4},{n:"Fjord",s:-1,tb:-6},{n:"Kreag",s:-1,tb:-11},{n:"Polaris",s:4,tb:-10},{n:"Tony",s:8,tb:-12},{n:"Nuble",s:12,tb:-15}],
+  "2022-pga": [{n:"Fjord",s:-14,tb:-8},{n:"Polaris",s:-10,tb:-12},{n:"Nuble",s:-7,tb:-14},{n:"Kreag",s:-6,tb:-11},{n:"Farthead",s:-6,tb:-14},{n:"Dirk",s:-4,tb:-15},{n:"Nate",s:-2,tb:-10},{n:"Timmy",s:4,tb:-13},{n:"Teej",s:5,tb:-7}],
+  "2022-us": [{n:"Nate",s:-10,tb:-11},{n:"Dirk",s:-9,tb:-12},{n:"Kreag",s:-8,tb:-11},{n:"Nuble",s:-2,tb:-14},{n:"Teej",s:3,tb:-9},{n:"Timmy",s:5,tb:-4},{n:"Polaris",s:9,tb:-13},{n:"Farthead",s:null,tb:-9}],
+  "2023-m": [{n:"Kreag",s:-20,tb:-12},{n:"Teej",s:-20,tb:-14},{n:"Farthead",s:-20,tb:-14},{n:"Polaris",s:-20,tb:-9},{n:"Timmy",s:-14,tb:-13},{n:"SOD",s:-11,tb:-11},{n:"Nuble",s:-11,tb:-14},{n:"Tony",s:-11,tb:-15},{n:"Nate",s:-10,tb:-16},{n:"Dirk",s:-5,tb:-14},{n:"Fjord",s:null,tb:-14}],
+  "2023-us": [{n:"Teej",s:-22,tb:-8},{n:"Nuble",s:-18,tb:-11},{n:"Farthead",s:-11,tb:-9},{n:"Timmy",s:-11,tb:-13},{n:"Dirk",s:-10,tb:-10},{n:"Fjord",s:-10,tb:-12},{n:"Nate",s:1,tb:-11},{n:"Polaris",s:1,tb:-12}],
+  "2024-bo": [{n:"Kreag",s:15,tb:-14},{n:"Polaris",s:19,tb:-13},{n:"Timmy",s:20,tb:-15},{n:"Teej",s:22,tb:-14},{n:"Nuble",s:23,tb:-13},{n:"Farthead",s:null,tb:-16}],
+  "2024-us": [{n:"Kreag",s:-2,tb:-11},{n:"Timmy",s:2,tb:-5},{n:"Teej",s:5,tb:-7},{n:"Farthead",s:6,tb:-4},{n:"Polaris",s:7,tb:-13},{n:"Nate",s:12,tb:-15},{n:"Nuble",s:13,tb:-14},{n:"Dirk",s:17,tb:-10}],
+  "2025-m": [{n:"Polaris",s:-34,tb:-12},{n:"Nate",s:-34,tb:-9},{n:"Kreag",s:-32,tb:-18},{n:"Fjord",s:-25,tb:-15},{n:"Nuble",s:-24,tb:-11},{n:"Timmy",s:-23,tb:-11},{n:"Teej",s:-20,tb:-14},{n:"Farthead",s:-19,tb:-13},{n:"Dirk",s:-5,tb:-11},{n:"SOD",s:null,tb:-13}],
+  "2025-us": [{n:"Nuble",s:17,tb:-7},{n:"Farthead",s:25,tb:-3},{n:"Timmy",s:30,tb:-1},{n:"Polaris",s:33,tb:-4},{n:"Teej",s:null,tb:-6},{n:"Nate",s:null,tb:-6},{n:"Fjord",s:null,tb:-10}],
+  "2025-bo": [{n:"Fjord",s:-31,tb:-8},{n:"Farthead",s:-30,tb:-14},{n:"Timmy",s:-25,tb:-12},{n:"Kreag",s:-24,tb:-13},{n:"Polaris",s:-23,tb:-10},{n:"Teej",s:-19,tb:-14},{n:"Nuble",s:-10,tb:-14}],
+};
 
 // ─── UTILS ───
 function parseOdds(str){if(!str)return{name:"",odds:"N/A",oddsNum:99999};const m=str.match(/^(.+?)\s+([+-]\d+)$/);
@@ -344,10 +379,10 @@ function TeamsView({picks,scores}){
       <h4 className="overlap-title">Most popular golfers</h4>
       <div className="overlap-grid">
         {Object.entries(popularity).filter(([,c])=>c>1).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([name,count])=>{
-          const{score,thru}=getScore(scores,name);
+          const{score,thru,mc,wd}=getScore(scores,name);
           return <div key={name} className="overlap-row">
             <span className="overlap-name">{name}</span>
-            <span className={`overlap-score ${score==null?"n":score<0?"u":score>0?"o":"ep"}`}>{fmt(score)}</span>
+            <span className={`overlap-score ${mc||wd?"mc":score==null?"n":score<0?"u":score>0?"o":"ep"}`}>{fmtMC(score,mc,wd)}</span>
             <ThruBadge thru={thru}/>
             <span className="overlap-count">{count}/{Object.keys(picks).length}</span>
           </div>;})}
@@ -618,24 +653,66 @@ function PicksView({tournament,tiers,existingPicks,onSubmit,participants}){
 
 // ─── HISTORY ───
 function HistoryView({history}){
-  const allTimeWins=useMemo(()=>{const w={};history.forEach(t=>{if(t.poolWinner)w[t.poolWinner]=(w[t.poolWinner]||0)+1;});
-    return Object.entries(w).sort((a,b)=>b[1]-a[1]);},[history]);
+  const [expanded,setExpanded]=useState(null);
+  const [majorFilter,setMajorFilter]=useState("all");
+  const majors=[{k:"all",l:"All"},{k:"m",l:"Masters"},{k:"pga",l:"PGA"},{k:"us",l:"US Open"},{k:"bo",l:"Open"}];
+  const filtered=useMemo(()=>majorFilter==="all"?history:history.filter(t=>{const s=t.id.split("-")[1];return s===majorFilter;}),[history,majorFilter]);
+  const allTimeWins=useMemo(()=>{const w={};filtered.forEach(t=>{if(t.poolWinner)w[t.poolWinner]=(w[t.poolWinner]||0)+1;});
+    return Object.entries(w).sort((a,b)=>b[1]-a[1]);},[filtered]);
+  const totalCompleted=filtered.filter(t=>t.status==="completed").length;
   return <div><h2 className="sec-t">Tournament history</h2>
-  {allTimeWins.length>0&&<div className="atw"><h3 className="atw-t">All-time pool wins</h3>
+  {allTimeWins.length>0&&<div className="atw"><div className="atw-hdr"><h3 className="atw-t">All-time pool wins</h3>
+    <div className="mf-pills">{majors.map(m=><button key={m.k} onClick={()=>setMajorFilter(m.k)} className={`mf-pill ${majorFilter===m.k?"on":""}`}>{m.l}</button>)}</div></div>
+    <div className="atw-sub">{totalCompleted} tournament{totalCompleted!==1?"s":""}</div>
     <div className="atw-grid">{allTimeWins.map(([n,c],i)=>
       <div key={n} className="atw-row"><span className="atw-pos">{i===0?"\u{1F947}":i===1?"\u{1F948}":i===2?"\u{1F949}":i+1}</span>
         <span className="atw-name">{n}</span><span className="atw-ct">{c}</span></div>)}</div></div>}
-  {!history.length?<p className="dim">No past tournaments.</p>:<div className="hist-l">{history.map(t=>
-    <div key={t.id} className={`hist-c ${t.status==="missing"?"hist-miss":""}`}>
-      <div className="hist-h"><span className="hist-n">{t.name}</span>
-        <span className="hist-b">{t.status==="missing"?"MISSING":t.status.toUpperCase()}</span></div>
-      {t.venue&&<div className="hist-v">{t.venue}</div>}
+  {!filtered.length?<p className="dim">No tournaments for this filter.</p>:<div className="hist-l">{filtered.map(t=>{
+    const isExp=expanded===t.id;
+    const isCancelled=t.status==="cancelled";
+    return <div key={t.id} className={`hist-c ${t.status==="missing"?"hist-miss":""} ${isCancelled?"hist-cancel":""}`}>
+      <div className="hist-h" onClick={()=>t.status==="completed"&&setExpanded(isExp?null:t.id)} style={t.status==="completed"?{cursor:"pointer"}:{}}>
+        <div><span className="hist-n">{t.name}</span>
+          {t.venue&&<div className="hist-v">{t.venue}</div>}</div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {t.status==="completed"&&<span className="exp-a" style={{color:"var(--dim)",fontSize:12}}>{isExp?"▲":"▼"}</span>}
+          <span className="hist-b">{isCancelled?"COVID":t.status==="missing"?"MISSING":""}</span>
+        </div>
+      </div>
       {t.champ&&<div className="hist-champ">{"\u{1F3C6}"} {t.champ} ({fmt(t.champScore)})</div>}
       {t.poolWinner?<div className="hist-w">{"\u{1F451}"} Pool: <strong>{t.poolWinner}</strong>
         <span className="mono"> (best 4: {fmt(t.poolScore)})</span></div>
-        :t.status==="missing"?<div style={{fontSize:12,color:"var(--dim)",fontStyle:"italic"}}>Pool data unavailable</div>:null}
-      {t.participants.length>0&&<div className="hist-p">{t.participants.length} in: {t.participants.join(", ")}</div>}
-    </div>)}</div>}</div>;}
+        :t.status==="missing"?<div style={{fontSize:12,color:"var(--dim)",fontStyle:"italic"}}>Pool data unavailable</div>
+        :isCancelled?<div style={{fontSize:12,color:"var(--dim)",fontStyle:"italic"}}>Cancelled due to COVID-19</div>:null}
+      {!isExp&&t.participants.length>0&&<div className="hist-p">{t.participants.length} participants</div>}
+      {isExp&&<div className="hist-detail">
+        {(()=>{const res=POOL_RESULTS[t.id];
+          if(res&&res.length>0) return <>
+            <div className="hist-res-hdr"><span className="hist-res-pos">#</span><span className="hist-res-name">Name</span><span className="hist-res-sc">Best 4</span><span className="hist-res-tb">TB</span></div>
+            {res.map((r,i)=>{
+              const isWinner=i===0&&t.poolWinner===r.n;
+              return <div key={r.n} className={`hist-res-row ${isWinner?"hist-res-w":""}`}>
+                <span className="hist-res-pos">{i+1}</span>
+                <span className="hist-res-name">{isWinner&&"\u{1F451} "}{r.n}</span>
+                <span className={`hist-res-sc ${r.s!=null?(r.s<0?"u":r.s>0?"o":"ep"):"n"}`}>{r.s!=null?fmt(r.s):"N/A"}</span>
+                <span className="hist-res-tb">{fmt(r.tb)}</span>
+              </div>;})}
+          </>;
+          // Fallback for tournaments without detailed results: show participants in order with winner score
+          return <>
+            <div className="hist-res-hdr"><span className="hist-res-pos">#</span><span className="hist-res-name">Name</span><span className="hist-res-sc">Best 4</span></div>
+            {t.participants.map((p,i)=>{
+              const isWinner=i===0&&t.poolWinner===p;
+              const sc=isWinner&&t.poolScore!=null?fmt(t.poolScore):null;
+              return <div key={p} className={`hist-res-row ${isWinner?"hist-res-w":""}`}>
+                <span className="hist-res-pos">{i+1}</span>
+                <span className="hist-res-name">{isWinner&&"\u{1F451} "}{p}</span>
+                <span className={`hist-res-sc ${sc?(t.poolScore<0?"u":t.poolScore>0?"o":"ep"):"n"}`}>{sc||"—"}</span>
+              </div>;})}
+          </>;
+        })()}
+      </div>}
+    </div>;})}</div>}</div>;}
 
 // ─── ADMIN ───
 function AdminView({tournament,picks,scores,setScores,setPicks,setTournament,participants,setLastUpdated}){
@@ -1070,6 +1147,7 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
   background:var(--card);border:1px solid var(--bd);border-radius:var(--r-sm);font-size:14px;gap:8px;box-shadow:var(--shadow)}
 .overlap-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .overlap-score{font-family:var(--fm);font-weight:600;text-align:right}
+.overlap-score.mc{color:var(--dim);font-style:italic;font-size:12px}
 .overlap-count{font-family:var(--fm);font-size:12px;color:var(--dim);text-align:right}
 
 .form-r{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
@@ -1135,6 +1213,22 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
 .hist-v{font-size:12px;color:var(--dim);font-family:var(--fm);margin-bottom:4px}
 .hist-champ{font-size:14px;color:var(--dim);margin-bottom:3px}
 .hist-miss{opacity:.4;border-style:dashed}
+.hist-cancel{opacity:.35;border-style:dashed}
+.mf-pills{display:flex;gap:4px;flex-wrap:wrap}
+.mf-pill{font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid var(--bd);background:var(--sa);color:var(--dim);font-family:var(--fm);font-weight:600;cursor:pointer}
+.mf-pill.on{background:var(--gd);color:#fff;border-color:var(--gd)}
+.atw-hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px}
+.atw-sub{font-size:11px;color:var(--dim);font-family:var(--fm);margin-bottom:8px}
+.hist-detail{margin-top:10px;border-top:1px solid var(--bd);padding-top:8px}
+.hist-res-hdr{display:flex;gap:8px;padding:4px 0;font-size:11px;color:var(--dim);font-family:var(--fm);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.hist-res-row{display:flex;gap:8px;padding:5px 0;font-size:14px;border-bottom:1px solid color-mix(in srgb,var(--bd) 50%,transparent)}
+.hist-res-row:last-child{border-bottom:none}
+.hist-res-w{font-weight:700;color:var(--gd)}
+.hist-res-pos{width:24px;text-align:center;font-family:var(--fm);color:var(--dim);font-size:13px}
+.hist-res-name{flex:1}
+.hist-res-sc{font-family:var(--fm);font-weight:600;width:50px;text-align:right}
+.hist-res-sc.u{color:var(--un)}.hist-res-sc.o{color:var(--ov)}.hist-res-sc.ep{color:var(--tx)}.hist-res-sc.n{color:var(--dim)}
+.hist-res-tb{font-family:var(--fm);font-size:12px;color:var(--dim);width:36px;text-align:right}
 .atw{border:1px solid var(--bd);border-radius:var(--r);padding:16px 18px;background:var(--card);
   backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);margin-bottom:16px;box-shadow:var(--shadow)}
 .atw-t{font-family:var(--fd);font-size:18px;color:var(--tx);margin-bottom:10px}
@@ -1241,8 +1335,7 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
   );
 }
 
-
-ReactDOM.render(<App/>, document.getElementById("root"));
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
