@@ -40,7 +40,7 @@ const DEFAULT_ODDS = [
   "Patrick Cantlay +6000","Sepp Straka +6000","Tyrrell Hatton +6000","Adam Scott +6600",
   "Corey Conners +6600","Jason Day +6600","Si Woo Kim +6600","Jake Knapp +6600",
   "Sam Burns +6600","Shane Lowry +6600","Cameron Smith +8000","Nicolai Hojgaard +8000",
-  "Jacob Bridgeman +8000","Arco Penge +9000","Gary Woodland +9000","Harris English +10000",
+  "Jacob Bridgeman +8000","Marco Penge +9000","Gary Woodland +9000","Harris English +10000",
   "Maverick McNealy +10000","Sungjae Im +10000","Max Homa +10000","Daniel Berger +12500",
   "J.J. Spaun +12500","Ben Griffin +12500","Kurt Kitayama +12500","Dustin Johnson +15000",
   "Keegan Bradley +15000","Rasmus Hojgaard +15000","Wyndham Clark +15000","Ryan Fox +15000",
@@ -59,13 +59,15 @@ const DEFAULT_ODDS = [
   "Jose Maria Olazabal +300000","Mike Weir +300000"
 ];
 
+// ─── CURRENT TOURNAMENT PICKS ───
+// Update this for each tournament with submitted picks
 const PICKS_2026 = {
   Tony:{name:"Tony",tiebreaker:-12,picks:["Scottie Scheffler +500","Xander Schauffele +1400","Hideki Matsuyama +3500","Patrick Cantlay +6000","Jason Day +6600","Shane Lowry +6600","Sungjae Im +10000"],timestamp:"2026-04-07T17:52:45"},
   Polaris:{name:"Polaris",tiebreaker:-13,picks:["Scottie Scheffler +500","Rory McIlroy +1100","Brooks Koepka +3300","Justin Rose +3300","Justin Thomas +5500","Sungjae Im +10000","Max Homa +10000"],timestamp:"2026-04-08T08:44:21"},
   Dirk:{name:"Dirk",tiebreaker:-11,picks:["Bryson DeChambeau +1000","Ludvig Aberg +1600","Robert MacIntyre +3300","Min Woo Lee +4000","Chris Gotterup +5000","Shane Lowry +6600","Jacob Bridgeman +8000"],timestamp:"2026-04-08T09:21:19"},
   SOD:{name:"SOD",tiebreaker:-12,picks:["Scottie Scheffler +500","Xander Schauffele +1400","Robert MacIntyre +3300","Hideki Matsuyama +3500","Akshay Bhatia +5500","Shane Lowry +6600","Cameron Smith +8000"],timestamp:"2026-04-08T14:30:46"},
   Timmy:{name:"Timmy",tiebreaker:-14,picks:["Bryson DeChambeau +1000","Xander Schauffele +1400","Justin Rose +3300","Robert MacIntyre +3300","Patrick Reed +3300","Jacob Bridgeman +8000","J.J. Spaun +12500"],timestamp:"2026-04-08T16:00:16"},
-  Nuble:{name:"Nuble",tiebreaker:-13,picks:["Bryson DeChambeau +1000","Xander Schauffele +1400","Justin Rose +3300","Viktor Hovland +4000","Akshay Bhatia +5500","Shane Lowry +6600","Arco Penge +9000"],timestamp:"2026-04-08T16:50:34"},
+  Nuble:{name:"Nuble",tiebreaker:-13,picks:["Bryson DeChambeau +1000","Xander Schauffele +1400","Justin Rose +3300","Viktor Hovland +4000","Akshay Bhatia +5500","Shane Lowry +6600","Marco Penge +9000"],timestamp:"2026-04-08T16:50:34"},
   Kreag:{name:"Kreag",tiebreaker:-13,picks:["Scottie Scheffler +500","Rory McIlroy +1100","Robert MacIntyre +3300","Hideki Matsuyama +3500","Jason Day +6600","Shane Lowry +6600","Gary Woodland +9000"],timestamp:"2026-04-08T17:44:17"},
   Nate:{name:"Nate",tiebreaker:-11,picks:["Scottie Scheffler +500","Ludvig Aberg +1600","Patrick Reed +3300","Min Woo Lee +4000","Akshay Bhatia +5500","Nicolai Hojgaard +8000","Sungjae Im +10000"],timestamp:"2026-04-08T18:43:25"},
   Teej:{name:"Teej",tiebreaker:-12,picks:["Scottie Scheffler +500","Jon Rahm +1100","Justin Rose +3300","Patrick Reed +3300","Akshay Bhatia +5500","Sam Burns +6600","Nicolai Hojgaard +8000"],timestamp:"2026-04-08T21:04:47"},
@@ -107,7 +109,7 @@ function buildTiers(odds){const g=odds.map((s,i)=>({...parseOdds(s),rank:i+1,raw
 function getTier(raw,tiers){for(const[k,t]of Object.entries(tiers))if(t.golfers.some(g=>g.raw===raw))return k;return null;}
 
 // Score lookup handles both old format (number) and new format ({s, thru})
-const NAME_ALIASES = {"Arco Penge":"Marco Penge"};
+const NAME_ALIASES = {};
 function stripAccents(s){return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/ø/g,"o").replace(/Ø/g,"O").replace(/å/g,"a").replace(/Å/g,"A").replace(/æ/g,"ae").replace(/Æ/g,"AE");}
 function getScore(scores,name){
   const aliased=NAME_ALIASES[name]||name;
@@ -136,15 +138,18 @@ function getScore(scores,name){
     });
     if(key)v=scores[key];
   }
-  if(v==null)return{score:null,thru:null,rounds:null,teeTime:null};
-  if(typeof v==="number")return{score:v,thru:18,rounds:null,teeTime:null};
-  return{score:v.s,thru:v.thru,rounds:v.r||null,teeTime:v.teeTime||null};
+  if(v==null)return{score:null,thru:null,rounds:null,teeTime:null,mc:false,wd:false};
+  if(typeof v==="number")return{score:v,thru:18,rounds:null,teeTime:null,mc:false,wd:false};
+  return{score:v.s,thru:v.thru,rounds:v.r||null,teeTime:v.teeTime||null,mc:!!v.mc,wd:!!v.wd};
 }
 function calcScore(picks,scores){
-  const gs=picks.map(p=>{const n=parseOdds(p).name;const{score,thru,rounds,teeTime}=getScore(scores,n);return{name:n,raw:p,score,thru,rounds,teeTime};});
-  const ws=gs.filter(g=>g.score!==null).sort((a,b)=>a.score-b.score);const b4=ws.slice(0,4);
+  const gs=picks.map(p=>{const n=parseOdds(p).name;const{score,thru,rounds,teeTime,mc,wd}=getScore(scores,n);return{name:n,raw:p,score,thru,rounds,teeTime,mc,wd};});
+  // Exclude MC/WD players from best 4 counting
+  const eligible=gs.filter(g=>g.score!==null&&!g.mc&&!g.wd);
+  const ws=eligible.sort((a,b)=>a.score-b.score);const b4=ws.slice(0,4);
   return{golfers:gs.map(g=>({...g,counting:b4.some(b=>b.name===g.name)})),total:ws.length>=4?b4.reduce((s,g)=>s+g.score,0):null};}
 function fmt(s){return s==null?"–":s===0?"E":s>0?`+${s}`:`${s}`;}
+function fmtMC(s,mc,wd){if(wd)return"WD";if(mc)return"MC";return fmt(s);}
 function fmtThru(thru){if(thru==null)return"";if(thru>=18)return"F";return`${thru}`;}
 
 // ─── SHARED COMPONENTS ───
@@ -252,7 +257,7 @@ function LeaderboardView({tournament,picks,scores,lastUpdated,onRefresh,liveStat
       {e.golfers.map((g,j)=>{const p=parseOdds(g.raw);const tk=getTier(g.raw,tiers);const rd=g.rounds||[null,null,null,null];return[
         <span key={`n${j}`} className={`dn ${g.counting?"ct":""}`}>{g.counting&&<span className="dot"/>}{g.name}
           <span className={`tt ${tk}`}>{p.odds}</span></span>,
-        <span key={`s${j}`} className={`ds ${g.counting?"ct":""} ${g.score==null?"n":g.score<0?"u":g.score>0?"o":"ep"}`}>{fmt(g.score)}</span>,
+        <span key={`s${j}`} className={`ds ${g.counting?"ct":""} ${g.mc||g.wd?"mc":g.score==null?"n":g.score<0?"u":g.score>0?"o":"ep"}`}>{fmtMC(g.score,g.mc,g.wd)}</span>,
         <span key={`r1${j}`} className="ds rd hide-mobile-sm">{rd[0]??"-"}</span>,
         <span key={`r2${j}`} className="ds rd hide-mobile-sm">{rd[1]??"-"}</span>,
         <span key={`r3${j}`} className="ds rd hide-mobile-sm">{rd[2]??"-"}</span>,
@@ -317,7 +322,7 @@ function TeamsView({picks,scores}){
                 </div>
               </div>
               <div className="tc-g-right">
-                <span className={`sv ${g.score==null?"n":g.score<0?"u":g.score>0?"o":"ep"}`}>{fmt(g.score)}</span>
+                <span className={`sv ${g.mc||g.wd?"mc":g.score==null?"n":g.score<0?"u":g.score>0?"o":"ep"}`}>{fmtMC(g.score,g.mc,g.wd)}</span>
                 <ThruBadge thru={g.thru} teeTime={g.teeTime}/>
               </div>
             </div>
@@ -432,7 +437,8 @@ function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatu
       const{score,thru,rounds,teeTime}=typeof v==="number"?{score:v,thru:18,rounds:null,teeTime:null}:{score:v.s,thru:v.thru,rounds:v.r||null,teeTime:v.teeTime||null};
       const holes=v?.holes||null;
       const today=v?.today??null;
-      return {name,score,thru,rounds,teeTime,holes,today,owners:pickedBy[name]||[]};
+      const mc=!!v?.mc;const wd=!!v?.wd;
+      return {name,score,thru,rounds,teeTime,holes,today,mc,wd,owners:pickedBy[name]||[]};
     }).sort((a,b)=>{
       // Players with scores first, sorted by score; then not-started players at the end
       if(a.score==null&&b.score==null)return 0;
@@ -518,7 +524,7 @@ function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatu
                 {hasPicked && <span className="sb-owners">{g.owners.join(", ")}</span>}
               </span>
               <span className={`sb-today hide-mobile-sm ${g.today == null ? "n" : g.today < 0 ? "u" : g.today > 0 ? "o" : "ep"}`}>{g.today != null ? (g.today === 0 ? "E" : (g.today > 0 ? "+" : "") + g.today) : "–"}</span>
-              <span className={`sb-scr sv ${g.score == null ? "n" : g.score < 0 ? "u" : g.score > 0 ? "o" : "ep"}`}>{g.score != null ? fmt(g.score) : "–"}</span>
+              <span className={`sb-scr sv ${g.mc?"mc":g.wd?"mc":g.score == null ? "n" : g.score < 0 ? "u" : g.score > 0 ? "o" : "ep"}`}>{g.mc?"MC":g.wd?"WD":g.score != null ? fmt(g.score) : "–"}</span>
               <span className="sb-thru"><ThruBadge thru={g.thru} teeTime={g.teeTime}/></span>
               <span className="sb-r hide-mobile-sm rd-cell">{rd[0] ?? "-"}</span>
               <span className="sb-r hide-mobile-sm rd-cell">{rd[1] ?? "-"}</span>
@@ -705,7 +711,12 @@ function BugReportView(){
 const CF_WORKER_URL = "https://golf-proxy.kreaganckennedy.workers.dev";
 // ────────────────────────────────────────────────────────────────
 
-const MASTERS_URL = "https://www.masters.com/en_US/scores/feeds/2026/scores.json";
+// ─── TOURNAMENT CONFIG ───
+// Update these for each major:
+const TOURNAMENT_YEAR = "2026";
+const MASTERS_URL = `https://www.masters.com/en_US/scores/feeds/${TOURNAMENT_YEAR}/scores.json`;
+// For non-Masters majors, set MASTERS_URL to null and ESPN will be used instead
+// const MASTERS_URL = null;
 const ESPN_HEADER_URL = "https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=golf&league=pga";
 const ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard";
 const CORS_PROXIES = [
@@ -799,7 +810,10 @@ function parseMastersData(data) {
       if (td === "E" || td === "0" || td === 0) today = 0;
       else if (td != null && td !== "") today = parseInt(td);
       if (isNaN(today)) today = null;
-      scores[name] = { s: scoreToPar, thru, r: rounds, teeTime, holes: holeScores, today };
+      // Detect missed cut: Masters.com uses status "C" for cut, or "WD" for withdrawal
+      const isCut = p.status === "C" || p.status === "CUT" || p.status === "MC";
+      const isWD = p.status === "WD" || p.status === "DQ";
+      scores[name] = { s: scoreToPar, thru, r: rounds, teeTime, holes: holeScores, today, mc: isCut, wd: isWD };
     }
     return { scores, tournamentName: "Masters Tournament", anyActive, golferCount: Object.keys(scores).length, coursePars };
   } catch (e) { return null; }
@@ -870,7 +884,7 @@ function parseESPNMerged(headerData, scoreboardData) {
 function App(){
   const[view,setView]=useState("leaderboard");const[isAdmin,setIsAdmin]=useState(false);
   const tiers=useMemo(()=>buildTiers(DEFAULT_ODDS),[]);
-  const[tournament,setTournament]=useState({id:"2026-masters",name:"2026 Masters",status:"active",course:"Augusta National",startDate:"2026-04-09",firstTeeTime:"2026-04-09T11:40:00Z",tiersLocked:false,tiers});
+  const[tournament,setTournament]=useState({id:`${TOURNAMENT_YEAR}-masters`,name:`${TOURNAMENT_YEAR} Masters`,status:"active",course:"Augusta National",startDate:"2026-04-09",firstTeeTime:"2026-04-09T11:40:00Z",tiersLocked:false,tiers});
   const[picks,setPicks]=useState(PICKS_2026);const[scores,setScores]=useState({});const[history]=useState(POOL_HISTORY);
   const[coursePars,setCoursePars]=useState(null);
   const[prevPositions,setPrevPositions]=useState({});
