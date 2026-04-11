@@ -676,29 +676,100 @@ function HistoryView({history}){
     return t;
   }),[history]);
 
+  const [statsSort,setStatsSort]=useState("wins");
   const filtered=useMemo(()=>majorFilter==="all"?enriched:enriched.filter(t=>{const s=t.id.split("-")[1];return s===majorFilter;}),[enriched,majorFilter]);
-  const allTimeWins=useMemo(()=>{const w={};filtered.forEach(t=>{if(t.poolWinner&&t.status==="completed")w[t.poolWinner]=(w[t.poolWinner]||0)+1;});
-    return Object.entries(w).sort((a,b)=>b[1]-a[1]);},[filtered]);
   const totalCompleted=filtered.filter(t=>t.status==="completed").length;
-  const personWins=useMemo(()=>{if(!selectedPerson)return[];return filtered.filter(t=>t.poolWinner===selectedPerson&&t.status==="completed").map(t=>({id:t.id,name:t.name,score:t.poolScore,champ:t.champ,champScore:t.champScore}));},[filtered,selectedPerson]);
+
+  // Full participation stats
+  const playerStats=useMemo(()=>{
+    const s={};
+    filtered.forEach(t=>{
+      if(t.status!=="completed")return;
+      const res=POOL_RESULTS[t.id];
+      if(!res||!res.length)return;
+      res.forEach((r,i)=>{
+        if(!s[r.n])s[r.n]={name:r.n,wins:0,entries:0,podiums:0,totalFinish:0,bestScore:null,wonTournaments:[]};
+        const p=s[r.n];
+        p.entries++;
+        p.totalFinish+=i+1;
+        if(i===0&&r.s!=null){p.wins++;p.wonTournaments.push({id:t.id,name:t.name,score:r.s,champ:t.champ,champScore:t.champScore});}
+        if(i<3)p.podiums++;
+        if(r.s!=null&&(p.bestScore===null||r.s<p.bestScore))p.bestScore=r.s;
+      });
+      // Also count participants who are in POOL_HISTORY but not in POOL_RESULTS (fallback)
+      if(!res.length){t.participants.forEach(name=>{
+        if(!s[name])s[name]={name,wins:0,entries:0,podiums:0,totalFinish:0,bestScore:null,wonTournaments:[]};
+        s[name].entries++;
+      });}
+    });
+    const arr=Object.values(s).map(p=>({...p,avgFinish:p.entries?+(p.totalFinish/p.entries).toFixed(1):99,winPct:p.entries?+(100*p.wins/p.entries).toFixed(0):0}));
+    const sortFns={wins:(a,b)=>b.wins-a.wins||b.entries-a.entries,entries:(a,b)=>b.entries-a.entries||b.wins-a.wins,
+      avgFinish:(a,b)=>a.avgFinish-b.avgFinish||b.wins-a.wins,podiums:(a,b)=>b.podiums-a.podiums||b.wins-a.wins,
+      winPct:(a,b)=>b.winPct-a.winPct||b.wins-a.wins};
+    arr.sort(sortFns[statsSort]||sortFns.wins);
+    return arr;
+  },[filtered,statsSort]);
+
+  const personWins=useMemo(()=>{if(!selectedPerson)return[];const p=playerStats.find(x=>x.name===selectedPerson);return p?p.wonTournaments:[];},[playerStats,selectedPerson]);
+  const personDetail=useMemo(()=>{
+    if(!selectedPerson)return null;
+    const p=playerStats.find(x=>x.name===selectedPerson);
+    if(!p)return null;
+    // Build per-tournament history for this person
+    const tournaments=[];
+    filtered.forEach(t=>{
+      if(t.status!=="completed")return;
+      const res=POOL_RESULTS[t.id];
+      if(!res)return;
+      const idx=res.findIndex(r=>r.n===selectedPerson);
+      if(idx>=0)tournaments.push({id:t.id,name:t.name,pos:idx+1,score:res[idx].s,total:res.length,champ:t.champ,champScore:t.champScore});
+    });
+    return{...p,tournaments};
+  },[filtered,selectedPerson,playerStats]);
+
   return <div><h2 className="sec-t">Tournament history</h2>
-  {allTimeWins.length>0&&<div className="atw"><div className="atw-hdr"><h3 className="atw-t">All-time pool wins</h3>
+  {playerStats.length>0&&<div className="atw"><div className="atw-hdr"><h3 className="atw-t">All-time standings</h3>
     <div className="mf-pills">{majors.map(m=><button key={m.k} onClick={()=>{setMajorFilter(m.k);setSelectedPerson(null);}} className={`mf-pill ${majorFilter===m.k?"on":""}`}>{m.l}</button>)}</div></div>
-    <div className="atw-sub">{totalCompleted} tournament{totalCompleted!==1?"s":""}</div>
-    <div className="atw-grid">{allTimeWins.map(([n,c],i)=>
-      <div key={n} className={`atw-row ${selectedPerson===n?"atw-sel":""}`} onClick={()=>setSelectedPerson(selectedPerson===n?null:n)} style={{cursor:"pointer"}}>
-        <span className="atw-pos">{i===0?"\u{1F947}":i===1?"\u{1F948}":i===2?"\u{1F949}":i+1}</span>
-        <span className="atw-name">{n}</span><span className="atw-ct">{c}</span>
-        <span className="atw-chev">{selectedPerson===n?"▲":"▼"}</span></div>)}
+    <div className="atw-sub">{totalCompleted} tournament{totalCompleted!==1?"s":""} · Tap a column to sort · Tap a name to drill down</div>
+    <div className="stats-tbl"><div className="stats-hdr">
+      <span></span><span style={{textAlign:"left"}}>Name</span>
+      <span className="stats-hdr-col" onClick={()=>setStatsSort("wins")}>W{statsSort==="wins"?"▼":""}</span>
+      <span className="stats-hdr-col" onClick={()=>setStatsSort("entries")}>GP{statsSort==="entries"?"▼":""}</span>
+      <span className="stats-hdr-col stats-wide" onClick={()=>setStatsSort("podiums")}>T3{statsSort==="podiums"?"▼":""}</span>
+      <span className="stats-hdr-col stats-wide" onClick={()=>setStatsSort("avgFinish")}>Avg{statsSort==="avgFinish"?"▼":""}</span>
     </div>
-    {selectedPerson&&personWins.length>0&&<div className="pw-detail">
-      <div className="pw-hdr">{"\u{1F451}"} {selectedPerson}'s {personWins.length} win{personWins.length!==1?"s":""}</div>
-      {personWins.map(w=><div key={w.id} className="pw-row" onClick={()=>{setSelectedPerson(null);setExpanded(w.id);
+    {playerStats.map((p,i)=>{
+      const isSel=selectedPerson===p.name;
+      return <div key={p.name} className={`stats-row ${isSel?"stats-sel":i%2===0?"ev":"od"}`} onClick={()=>setSelectedPerson(isSel?null:p.name)}>
+        <span className="stats-pos">{i===0?"\u{1F947}":i===1?"\u{1F948}":i===2?"\u{1F949}":i+1}</span>
+        <span className="stats-name">{p.name}</span>
+        <span className="stats-col stats-wins">{p.wins||"–"}</span>
+        <span className="stats-col">{p.entries}</span>
+        <span className="stats-col stats-wide">{p.podiums}</span>
+        <span className="stats-col stats-wide">{p.avgFinish}</span>
+      </div>;})}
+    </div>
+    {selectedPerson&&personDetail&&<div className="pw-detail">
+      <div className="pw-hdr-row">
+        <span className="pw-hdr">{selectedPerson}</span>
+        <span className="pw-summary">{personDetail.wins}W · {personDetail.entries}GP · {personDetail.podiums} top-3 · avg {personDetail.avgFinish}</span>
+      </div>
+      {personWins.length>0&&<><div className="pw-sec">{"\u{1F451}"} {personWins.length} win{personWins.length!==1?"s":""}</div>
+      {personWins.map(w=><div key={w.id} className="pw-row" onClick={e=>{e.stopPropagation();setSelectedPerson(null);setExpanded(w.id);
         setTimeout(()=>{const el=document.getElementById("hist-"+w.id);if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},100);}}>
         <span className="pw-name">{w.name}</span>
         <span className="pw-sc">{fmt(w.score)}</span>
         <span className="pw-champ">{w.champ} ({fmt(w.champScore)})</span>
-      </div>)}
+      </div>)}</>}
+      {personDetail.tournaments.length>0&&<><div className="pw-sec">All results ({personDetail.tournaments.length})</div>
+      <div className="pw-all">{personDetail.tournaments.map(t=>{
+        const posStr=t.pos===1?"\u{1F451}":t.pos<=3?"\u{1F3C5}":"";
+        return <div key={t.id} className={`pw-trow ${t.pos===1?"pw-tw":t.pos<=3?"pw-t3":""}`} onClick={e=>{e.stopPropagation();setSelectedPerson(null);setExpanded(t.id);
+          setTimeout(()=>{const el=document.getElementById("hist-"+t.id);if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},100);}}>
+          <span className="pw-tpos">{posStr}{t.pos}/{t.total}</span>
+          <span className="pw-tname">{t.name}</span>
+          <span className="pw-tsc">{t.score!=null?fmt(t.score):"N/A"}</span>
+        </div>;})}</div></>}
     </div>}
   </div>}
   {!filtered.length?<p className="dim">No tournaments for this filter.</p>:<div className="hist-l">{filtered.map(t=>{
@@ -1273,6 +1344,51 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
 .atw-row{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--sa);border-radius:8px;font-size:15px;min-width:110px}
 .atw-pos{font-size:16px;width:24px;text-align:center}.atw-name{font-weight:600;flex:1}.atw-ct{font-family:var(--fm);font-weight:700;color:var(--gd);font-size:16px}
 .mono{font-family:var(--fm)}.dim{color:var(--dim)}
+.stats-tbl{border-radius:var(--r);overflow:hidden;border:1px solid var(--bd);margin-top:4px}
+.stats-hdr{display:grid;grid-template-columns:32px 1fr 36px 36px 36px 42px;padding:10px 14px;
+  background:var(--gd);color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  font-family:var(--fm);align-items:center}
+.stats-row{display:grid;grid-template-columns:32px 1fr 36px 36px 36px 42px;padding:10px 14px;
+  cursor:pointer;transition:background .15s;align-items:center;border-bottom:1px solid color-mix(in srgb,var(--bd) 40%,transparent)}
+.stats-row:last-child{border-bottom:none}
+.stats-row.ev{background:var(--sf)}.stats-row.od{background:var(--sa)}
+.stats-row:hover{background:var(--gl)!important}
+.stats-row:active{transform:scale(.997)}
+.stats-sel{background:var(--gd)!important;color:#fff}
+.stats-sel .stats-name{color:#fff}.stats-sel .stats-col{color:rgba(255,255,255,.9)}.stats-sel .stats-wins{color:#fff}
+.stats-sel .stats-pos{color:rgba(255,255,255,.8);font-size:13px}
+.stats-pos{text-align:center;font-size:15px;color:var(--dim)}
+.stats-name{font-weight:600;font-size:14px;font-family:var(--fd);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx)}
+.stats-col{text-align:center;font-size:13px;font-family:var(--fm);color:var(--tx)}
+.stats-wide{display:none}
+@media(min-width:420px){.stats-hdr{grid-template-columns:32px 1fr 36px 36px 36px 42px}.stats-row{grid-template-columns:32px 1fr 36px 36px 36px 42px}.stats-wide{display:block}}
+@media(max-width:419px){.stats-hdr{grid-template-columns:32px 1fr 36px 36px}.stats-row{grid-template-columns:32px 1fr 36px 36px}}
+.stats-wins{font-weight:800;color:var(--gd);font-size:15px}
+.stats-hdr-col{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:center;gap:1px}
+.stats-hdr-col:hover{opacity:.8}
+.pw-detail{margin-top:12px;padding:16px;background:var(--card);border-radius:var(--r);border:1px solid var(--bd);
+  box-shadow:var(--shadow);animation:fadePw .25s ease}
+.pw-hdr-row{display:flex;align-items:baseline;gap:10px;margin-bottom:2px;flex-wrap:wrap}
+.pw-hdr{font-family:var(--fd);font-size:20px;color:var(--tx);font-weight:700}
+.pw-summary{font-size:12px;color:var(--dim);font-family:var(--fm);background:var(--sa);padding:3px 10px;border-radius:20px}
+.pw-sec{font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 6px;
+  padding-top:10px;border-top:1px solid var(--bd)}
+.pw-row{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;cursor:pointer;
+  font-size:13px;transition:background .15s;background:var(--sa);margin-bottom:4px}
+.pw-row:hover{background:var(--gl)}
+.pw-name{font-weight:700;flex:1;font-size:14px;font-family:var(--fd);color:var(--tx)}
+.pw-sc{font-family:var(--fm);font-weight:800;color:var(--gd);min-width:44px;text-align:right;font-size:15px}
+.pw-champ{font-size:11px;color:var(--dim);font-family:var(--fm);white-space:nowrap}
+.pw-all{max-height:340px;overflow-y:auto;margin-top:4px}
+.pw-trow{display:grid;grid-template-columns:48px 1fr 44px;gap:4px;padding:7px 12px;border-radius:6px;cursor:pointer;
+  font-size:13px;transition:background .15s;align-items:center;border-bottom:1px solid color-mix(in srgb,var(--bd) 30%,transparent)}
+.pw-trow:last-child{border-bottom:none}
+.pw-trow:hover{background:var(--gl)}
+.pw-tw{background:rgba(22,163,74,.06)}.pw-t3{background:rgba(250,204,21,.04)}
+.pw-tpos{font-family:var(--fm);font-weight:700;font-size:12px;color:var(--dim);text-align:center}
+.pw-tname{font-family:var(--fd);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:var(--tx)}
+.pw-tsc{font-family:var(--fm);font-weight:700;text-align:right;font-size:13px}
+@keyframes fadePw{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 
 .ac{border:1px solid var(--bd);border-radius:var(--r);padding:16px 18px;margin-bottom:16px;background:var(--card);
   backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:var(--shadow)}
