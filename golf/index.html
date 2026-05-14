@@ -479,6 +479,30 @@ function HoleScorecard({holeScores,coursePars,playerThru}){
 }
 
 // ─── SCOREBOARD (actual tournament leaderboard) ───
+function PGATScorecardLoader({playerId, playerThru, coursePars}) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!playerId) { setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const sc = await fetchPGATScorecard(playerId);
+        if (!cancelled && sc) {
+          const parsed = parsePGATScorecard(sc);
+          if (parsed) setData(parsed);
+        }
+      } catch(e) {}
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [playerId]);
+
+  if (loading) return <div style={{padding:"8px 12px",color:"var(--dim)",fontSize:13,fontFamily:"var(--fm)"}}>Loading scorecard...</div>;
+  if (!data?.holeScores) return <div style={{padding:"8px 12px",color:"var(--dim)",fontSize:13}}>No hole-by-hole data available</div>;
+  return <HoleScorecard holeScores={data.holeScores} coursePars={data.coursePars?.[0] || coursePars?.[0]} playerThru={playerThru}/>;
+}
+
 function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatus,autoRefresh,setAutoRefresh,coursePars,prevPositions}){
   const[expanded,setExpanded]=useState(null);
   // Build full field leaderboard from scores
@@ -587,7 +611,7 @@ function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatu
               <span className="sb-r hide-mobile-sm rd-cell">{rd[2] ?? "-"}</span>
               <span className="sb-r hide-mobile-sm rd-cell">{rd[3] ?? "-"}</span>
             </div>
-            {isExp && <div className="sb-expanded"><HoleScorecard holeScores={g.holes} coursePars={coursePars?.[0]} playerThru={g.thru}/></div>}
+            {isExp && <div className="sb-expanded">{g.holes ? <HoleScorecard holeScores={g.holes} coursePars={coursePars?.[0]} playerThru={g.thru}/> : scores[g.name]?.pgatId ? <PGATScorecardLoader playerId={scores[g.name].pgatId} playerThru={g.thru} coursePars={coursePars}/> : <div style={{padding:"8px 12px",color:"var(--dim)",fontSize:13}}>No scorecard data</div>}</div>}
             {showCutLine && <div className="cut-line"><span className="cut-label">✂️ Projected Cut ({fmt(cutScore)})</span></div>}
           </div>;
         });
@@ -841,7 +865,125 @@ async function proxyFetch(url) {
   return null;
 }
 
+// ─── PGA TOUR API CONFIG ───
+const PGAT_TOURNAMENT_ID = "R2026033";
+
+async function pgatFetch(queryType, extraParams = {}) {
+  if (!CF_WORKER_URL || CF_WORKER_URL.includes("YOUR-SUBDOMAIN")) return null;
+  try {
+    const params = new URLSearchParams({ query: queryType, tournamentId: PGAT_TOURNAMENT_ID, ...extraParams });
+    const res = await fetch(`${CF_WORKER_URL}/pgatour?${params}`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const payload = json?.data?.leaderboardCompressedV3?.payload || json?.data?.scorecardCompressedV3?.payload;
+    if (!payload) return null;
+    // Decode gzip+base64 payload
+    const raw = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+    const ds = new DecompressionStream("gzip");
+    const writer = ds.writable.getWriter();
+    writer.write(raw);
+    writer.close();
+    const reader = ds.readable.getReader();
+    const chunks = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    const merged = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
+    let offset = 0;
+    for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+    return JSON.parse(new TextDecoder().decode(merged));
+  } catch (e) { console.warn("pgatFetch error:", e); return null; }
+}
+
+async function fetchPGATScorecard(playerId) {
+  return pgatFetch("Scorecard", { playerId });
+}
+
+function parsePGATLeaderboard(data) {
+  if (!data?.players) return null;
+  const scores = {};
+  let anyActive = false;
+  const courseParsArr = [];
+
+  for (const p of data.players) {
+    const name = p.player?.displayName;
+    if (!name) continue;
+    const sd = p.scoringData || p;
+    let scoreToPar = null;
+    const tp = sd.total || sd.toPar;
+    if (tp === "E" || tp === "0" || tp === 0) scoreToPar = 0;
+    else if (tp != null && tp !== "" && tp !== "-") scoreToPar = parseInt(tp);
+    if (isNaN(scoreToPar)) scoreToPar = null;
+
+    let thru = 18, teeTime = null;
+    const thruVal = sd.thru;
+    if (thruVal === "F" || thruVal === "18" || thruVal === 18) thru = 18;
+    else if (thruVal === "" || thruVal == null || thruVal === "-") { thru = 0; teeTime = sd.teeTime || null; }
+    else if (!isNaN(parseInt(thruVal))) { thru = parseInt(thruVal); if (thru > 0 && thru < 18) anyActive = true; }
+
+    const state = sd.playerState || p.status;
+    if (state === "ACTIVE" || state === "active") anyActive = true;
+    const isCut = state === "CUT" || state === "MC" || state === "C";
+    const isWD = state === "WD" || state === "DQ";
+
+    const rounds = (sd.rounds || []).map(r => {
+      const v = r.strokes || r.total;
+      return v != null ? parseInt(v) : null;
+    });
+    while (rounds.length < 4) rounds.push(null);
+
+    let today = null;
+    const cr = sd.currentRoundScore;
+    if (cr === "E" || cr === "0") today = 0;
+    else if (cr != null && cr !== "" && cr !== "-") today = parseInt(cr);
+    if (isNaN(today)) today = null;
+
+    scores[name] = { s: scoreToPar, thru, r: rounds, teeTime, today, mc: isCut, wd: isWD, pgatId: p.player?.id || p.id };
+  }
+  return { scores, tournamentName: data.tournamentName || "PGA Championship", anyActive, golferCount: Object.keys(scores).length };
+}
+
+function parsePGATScorecard(data) {
+  if (!data?.roundScores) return null;
+  const holeScores = [];
+  const coursePars = [];
+  for (const rs of data.roundScores) {
+    const holes = [];
+    const pars = [];
+    const allHoles = [...(rs.firstNine?.holes || []), ...(rs.secondNine?.holes || [])];
+    for (let i = 0; i < 18; i++) {
+      const h = allHoles[i];
+      if (h) {
+        holes.push(parseInt(h.score) || null);
+        pars.push(h.par || 4);
+      } else {
+        holes.push(null);
+        pars.push(4);
+      }
+    }
+    holeScores.push(holes.some(h => h != null) ? holes : null);
+    if (pars.length === 18) coursePars.push(pars);
+  }
+  while (holeScores.length < 4) holeScores.push(null);
+  return { holeScores, coursePars: coursePars.length > 0 ? coursePars : null };
+}
+
 async function fetchESPNScores() {
+  // Try PGA Tour API first (has hole-by-hole data)
+  try {
+    const pgatData = await pgatFetch("Leaderboard");
+    if (pgatData?.players) {
+      const result = parsePGATLeaderboard(pgatData);
+      if (result && result.golferCount > 0) {
+        result.isPGAT = true;
+        return result;
+      }
+    }
+  } catch (e) { console.warn("PGAT leaderboard failed:", e); }
+
+  // Fallback: ESPN merged
   // Try Masters.com first (full field + thru data) — only works via CF Worker
   if (CF_WORKER_URL && !CF_WORKER_URL.includes("YOUR-SUBDOMAIN")) {
     const mastersData = await proxyFetch(MASTERS_URL);
@@ -852,7 +994,6 @@ async function fetchESPNScores() {
       }
     }
   }
-  // Fallback: ESPN merged
   const [headerData, scoreboardData] = await Promise.all([
     proxyFetch(ESPN_HEADER_URL),
     proxyFetch(ESPN_SCOREBOARD_URL)
