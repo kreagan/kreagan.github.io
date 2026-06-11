@@ -143,6 +143,22 @@ img.flag.sm{width:20px;height:14px}
 .pk-tab{padding:7px 14px;border:1px solid var(--bd);background:var(--panel);color:var(--dim);border-radius:20px;font-family:var(--fm);font-size:12px;font-weight:700;cursor:pointer}
 .pk-tab.on{background:var(--grn-d);color:#fff;border-color:var(--grn-d)}
 
+.pick-strip{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px 10px;border-top:1px solid rgba(255,255,255,.05)}
+.pick-chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--fm);font-size:11px;font-weight:700;color:var(--dim);background:var(--bg);border:1px solid var(--bd);padding:3px 9px;border-radius:14px;letter-spacing:.3px}
+.pick-chip .who{color:var(--tx)}
+.pick-chip.win{border-color:var(--grn-d);background:rgba(60,228,146,.08);color:var(--grn)}
+.pick-chip.win .who{color:var(--grn)}
+
+.cmp{width:100%;border-collapse:collapse;font-family:var(--fm);font-size:12px}
+.cmp th{padding:8px 6px;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bd);text-align:center}
+.cmp th.rk{width:38px}
+.cmp td{padding:7px 6px;text-align:center;border-bottom:1px solid rgba(255,255,255,.04)}
+.cmp tr:last-child td{border-bottom:none}
+.cmp td.rk{color:var(--dim);font-weight:700;font-size:11px}
+.cmp td .code{margin-left:5px;font-weight:700}
+.cmp tr.win td{background:rgba(60,228,146,.06)}
+.cmp td.diff{box-shadow:inset 0 0 0 1px rgba(255,203,61,.3);background:rgba(255,203,61,.06)}
+
 .refresh{display:flex;align-items:center;justify-content:space-between;margin:10px 16px;padding:9px 14px;background:var(--panel);border:1px solid var(--bd);border-radius:12px;font-family:var(--fm);font-size:12px;color:var(--dim)}
 .refresh .st{display:flex;align-items:center;gap:7px}
 .refresh .dot{width:7px;height:7px;border-radius:50%;background:var(--grn)}
@@ -293,6 +309,31 @@ const STAT_CATEGORIES=[
   {keys:["saves","totalSaves"],label:"🧤 Most Saves",unit:"saves"}
 ];
 
+const GROUP_OF={};Object.entries(GROUPS).forEach(([g,teams])=>teams.forEach(([nm])=>{GROUP_OF[nm]=g;}));
+const ORD=["1st","2nd","3rd","4th"];
+const toAppName=nm=>NAME_ALIASES_REV[nm]||nm;
+// For a group-stage match, each player's "side": the team they ranked higher of the two
+function matchPicks(homeName,awayName){
+  const h=toAppName(homeName),a=toAppName(awayName);
+  const g=GROUP_OF[h];
+  if(!g||GROUP_OF[a]!==g)return null;
+  const picks=Object.entries(PICKS).map(([name,p])=>{
+    const order=p.groups?.[g]||[];
+    const hi=order.indexOf(h),ai=order.indexOf(a);
+    if(hi<0||ai<0)return null;
+    return {name,team:hi<ai?h:a,rank:Math.min(hi,ai)+1};
+  }).filter(Boolean);
+  return picks.length?{group:g,picks}:null;
+}
+function PickStrip({home,away}){
+  const mp=matchPicks(home,away);
+  if(!mp)return null;
+  return <div className="pick-strip">{mp.picks.map(pk=>
+    <span key={pk.name} className={`pick-chip ${pk.rank===1?"win":""}`}>
+      <span className="who">{pk.name}</span><Flag team={pk.team} size="sm"/>{ORD[pk.rank-1]}
+    </span>)}</div>;
+}
+
 function Banner({title,sub,live}){
   return <div className="banner"><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",position:"relative",zIndex:1}}>
     <div><div className="banner-t">{title}</div><div className="banner-s">{sub}</div></div>
@@ -383,6 +424,7 @@ function MatchCard({m,onTap}){
     <div className="match-h"><span>{m.name?.includes("Group")?m.name:(m.venue||"Match")}</span><span className={`match-status ${cls}`}>{txt}</span></div>
     {[m.home,m.away].map((t,i)=><div key={i} className={`match-row ${t.won?"w":m.state!=="pre"&&decided&&!t.won?"l":""}`}>
       <span className="match-team"><Flag team={t.name}/>{t.name}</span><span className="match-score">{m.state!=="pre"?(t.score??"0"):"–"}</span></div>)}
+    <PickStrip home={m.home.name} away={m.away.name}/>
     <div className="match-foot">{m.bcast&&<span>📺 {m.bcast}</span>}<span className="match-tap">Details →</span></div></div>;
 }
 function MatchDetail({match,onBack}){
@@ -401,6 +443,11 @@ function MatchDetail({match,onBack}){
       <div className="md-hero-status">{statusTxt}</div>
       {m.venue&&<div className="md-hero-meta">📍 {m.venue}</div>}
       {(m.home.form||m.away.form)&&<div className="md-hero-meta">Recent form: {m.home.form||"—"} vs {m.away.form||"—"}</div>}</div>
+    {(()=>{const mp=matchPicks(m.home.name,m.away.name);return mp&&<div className="md-sec"><div className="md-sec-h">📋 Pool picks · Group {mp.group}</div>
+      <div className="panel" style={{margin:0}}>{mp.picks.map(pk=><div className="md-event" key={pk.name}>
+        <span style={{flex:1,fontWeight:700}}>{pk.name}</span><Flag team={pk.team} size="sm"/><span>{pk.team}</span>
+        <span style={{fontFamily:"var(--fm)",fontSize:12,color:pk.rank===1?"var(--grn)":"var(--dim)"}}>{pk.rank===1?"group winner":ORD[pk.rank-1]+" in group"}</span>
+      </div>)}</div></div>;})()}
     {loading&&<div className="md-loading">Loading match details…</div>}
     {!loading&&parsed.events.length>0&&<div className="md-sec"><div className="md-sec-h">⚡ Key events</div>
       <div className="panel" style={{margin:0}}>{parsed.events.map((e,i)=><div className="md-event" key={i}><span className="min">{e.clock}</span><span className="ico">{e.icon}</span><span style={{flex:1}}>{e.text}</span></div>)}</div></div>}
@@ -451,20 +498,49 @@ function RefreshBar({lastUpdated,onRefresh,liveStatus}){
   return <div className="refresh"><span className="st"><span className={`dot ${liveStatus==="idle"?"idle":""}`}></span>{liveStatus==="fetching"?"Updating…":`Updated ${ago}`}</span><button className="refresh-btn" onClick={onRefresh}>↻</button></div>;
 }
 function PicksView(){
-  const [sel,setSel]=useState(Object.keys(PICKS)[0]||null);
-  if(Object.keys(PICKS).length===0)return <div>
+  const names=Object.keys(PICKS);
+  const [sel,setSel]=useState("compare");
+  if(names.length===0)return <div>
     <Banner title="Everyone's Picks" sub="See what each player predicted"/>
     <div className="empty"><div className="big">📋</div><strong>No picks submitted yet</strong>
       <p style={{marginTop:8,fontSize:14}}>Fill out the prediction form and picks show up here to compare.</p></div>
     <a className="cta" href={FORM_URL} target="_blank" rel="noopener noreferrer">Make your picks →</a></div>;
-  const p=PICKS[sel];
-  return <div><Banner title="Everyone's Picks" sub="Tap a name to see their bracket"/>
-    <div className="pk-tabs">{Object.keys(PICKS).map(n=><button key={n} className={`pk-tab ${sel===n?"on":""}`} onClick={()=>setSel(n)}>{n}</button>)}</div>
-    {p&&<><div className="info" style={{marginBottom:0,display:"flex",gap:8,alignItems:"center"}}><strong>{sel}'s champion:</strong> {p.champion?<><Flag team={p.champion} size="sm"/>{p.champion}</>:"—"}</div>
-      {Object.entries(p.groups||{}).map(([letter,order])=><div className="grp" key={letter}>
-        <div className="grp-h"><span>Group {letter}</span></div>
-        {order.map((nm,i)=><div key={nm} className={`grp-team ${i<2?"q1":""}`}><span className="rank">{i+1}</span><Flag team={nm}/><span className="nm">{nm}</span>{i<2&&<span className="seed" style={{background:"var(--grn-d)",color:"#fff"}}>advances</span>}</div>)}
-      </div>)}</>}</div>;
+  return <div><Banner title="Everyone's Picks" sub="Compare side by side or tap a name for a full bracket"/>
+    <div className="pk-tabs">
+      <button className={`pk-tab ${sel==="compare"?"on":""}`} onClick={()=>setSel("compare")}>⚖ Compare</button>
+      {names.map(n=><button key={n} className={`pk-tab ${sel===n?"on":""}`} onClick={()=>setSel(n)}>{n}</button>)}
+    </div>
+    {sel==="compare"?<CompareView names={names}/>:<PlayerPicks name={sel}/>}
+  </div>;
+}
+function CompareView({names}){
+  return <div>
+    <div className="info">Each column is one player's predicted group finish. Rows where picks <span style={{color:"var(--gold)"}}>differ are gold</span>; the green row is everyone's group-winner pick.</div>
+    {Object.keys(GROUPS).map(letter=><div className="grp" key={letter}>
+      <div className="grp-h"><span>Group {letter}</span></div>
+      <table className="cmp">
+        <thead><tr><th className="rk"></th>{names.map(n=><th key={n}>{n}</th>)}</tr></thead>
+        <tbody>{[0,1,2,3].map(r=>{
+          const row=names.map(n=>PICKS[n].groups?.[letter]?.[r]);
+          const diff=new Set(row.filter(Boolean)).size>1;
+          return <tr key={r} className={r===0?"win":""}>
+            <td className="rk">{ORD[r]}</td>
+            {row.map((t,i)=><td key={i} className={diff?"diff":""}>{t?<><Flag team={t} size="sm"/><span className="code">{(LOGO[t]||t.slice(0,3)).toUpperCase()}</span></>:"—"}</td>)}
+          </tr>;})}</tbody>
+      </table>
+    </div>)}
+  </div>;
+}
+function PlayerPicks({name}){
+  const p=PICKS[name];
+  if(!p)return null;
+  return <>
+    <div className="info" style={{marginBottom:0,display:"flex",gap:8,alignItems:"center"}}><strong>{name}'s champion:</strong> {p.champion?<><Flag team={p.champion} size="sm"/>{p.champion}</>:"—"}</div>
+    {Object.entries(p.groups||{}).map(([letter,order])=><div className="grp" key={letter}>
+      <div className="grp-h"><span>Group {letter}</span></div>
+      {order.map((nm,i)=><div key={nm} className={`grp-team ${i<2?"q1":""}`}><span className="rank">{i+1}</span><Flag team={nm}/><span className="nm">{nm}</span>{i<2&&<span className="seed" style={{background:"var(--grn-d)",color:"#fff"}}>advances</span>}</div>)}
+    </div>)}
+  </>;
 }
 function parseRoster(data){
   // ESPN roster: athletes[] (flat) or athletes[].items[] (grouped); coach in data.coach[]
@@ -624,7 +700,7 @@ function App(){
   useEffect(()=>{fetchLive();const id=setInterval(fetchLive,60000);return()=>clearInterval(id);},[fetchLive]);
   return <>
     <div className="hdr"><div className="hdr-title"><span className="ball">⚽</span>K&amp;M World Cup Pool</div><div className="hdr-sub">2026 · USA · Canada · Mexico</div></div>
-    <div className="tabs">{[["leaderboard","Table"],["groups","Groups"],["scores","Scores"],["teams","Teams"],["stats","Stats"],["picks","Picks"]].map(([k,l])=><button key={k} className={`tab ${view===k?"on":""}`} onClick={()=>setView(k)}>{l}</button>)}</div>
+    <div className="tabs">{[["leaderboard","Table"],["picks","Picks"],["scores","Scores"],["groups","Groups"],["teams","Teams"],["stats","Stats"]].map(([k,l])=><button key={k} className={`tab ${view===k?"on":""}`} onClick={()=>setView(k)}>{l}</button>)}</div>
     {view==="leaderboard"&&<Leaderboard standings={standings} matches={matches}/>}
     {view==="groups"&&<GroupsView standings={standings}/>}
     {view==="scores"&&<ScoresView matches={matches} lastUpdated={lastUpdated} onRefresh={fetchLive} liveStatus={liveStatus}/>}
