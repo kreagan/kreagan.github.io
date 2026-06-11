@@ -211,7 +211,11 @@ function Flag({team,size}){
 const GROUPS={A:[["Mexico",2],["Czechia",3],["South Korea",2],["South Africa",4]],B:[["Switzerland",2],["Canada",2],["Bosnia-Herzegovina",3],["Qatar",4]],C:[["Brazil",1],["Morocco",2],["Scotland",3],["Haiti",4]],D:[["United States",1],["Paraguay",3],["Australia",3],["Türkiye",2]],E:[["Germany",1],["Ecuador",2],["Ivory Coast",3],["Curaçao",4]],F:[["Netherlands",1],["Japan",2],["Sweden",3],["Tunisia",4]],G:[["Belgium",1],["Egypt",3],["Iran",3],["New Zealand",4]],H:[["Spain",1],["Uruguay",2],["Saudi Arabia",4],["Cape Verde",4]],I:[["France",1],["Senegal",2],["Norway",3],["Iraq",4]],J:[["Argentina",1],["Austria",3],["Algeria",3],["Jordan",4]],K:[["Portugal",1],["Colombia",2],["Congo DR",3],["Uzbekistan",4]],L:[["England",1],["Croatia",2],["Ghana",3],["Panama",4]]};
 const SCORING={groupWinner:5,groupRunnerUp:3,teamAdvances:3,exactOrderBonus:8,knockout:{R32:4,R16:8,QF:16,SF:24,F:32},champion:16,underdogMultiplier:{R32:1,R16:2,QF:3,SF:4,F:5}};
 const ESPN_LEADERS="https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/leaders";
-const PICKS={};
+const PICKS={
+  Kreag:{groups:{A:["Mexico","South Korea","Czechia","South Africa"],B:["Switzerland","Bosnia-Herzegovina","Canada","Qatar"],C:["Brazil","Morocco","Scotland","Haiti"],D:["United States","Türkiye","Australia","Paraguay"],E:["Germany","Ecuador","Ivory Coast","Curaçao"],F:["Sweden","Netherlands","Japan","Tunisia"],G:["Belgium","Egypt","New Zealand","Iran"],H:["Spain","Uruguay","Saudi Arabia","Cape Verde"],I:["France","Norway","Senegal","Iraq"],J:["Argentina","Austria","Algeria","Jordan"],K:["Colombia","Portugal","Congo DR","Uzbekistan"],L:["England","Croatia","Ghana","Panama"]},tiebreaker:133},
+  Polaris:{groups:{A:["Mexico","South Korea","Czechia","South Africa"],B:["Switzerland","Canada","Bosnia-Herzegovina","Qatar"],C:["Brazil","Morocco","Scotland","Haiti"],D:["United States","Türkiye","Paraguay","Australia"],E:["Germany","Ecuador","Ivory Coast","Curaçao"],F:["Netherlands","Japan","Sweden","Tunisia"],G:["Belgium","Egypt","New Zealand","Iran"],H:["Spain","Uruguay","Cape Verde","Saudi Arabia"],I:["France","Norway","Senegal","Iraq"],J:["Argentina","Austria","Algeria","Jordan"],K:["Colombia","Portugal","Congo DR","Uzbekistan"],L:["England","Croatia","Ghana","Panama"]},tiebreaker:130},
+  Teej:{groups:{A:["Czechia","Mexico","South Korea","South Africa"],B:["Switzerland","Canada","Bosnia-Herzegovina","Qatar"],C:["Brazil","Morocco","Scotland","Haiti"],D:["United States","Türkiye","Paraguay","Australia"],E:["Germany","Ecuador","Ivory Coast","Curaçao"],F:["Netherlands","Japan","Sweden","Tunisia"],G:["Belgium","Egypt","New Zealand","Iran"],H:["Spain","Uruguay","Saudi Arabia","Cape Verde"],I:["France","Norway","Senegal","Iraq"],J:["Argentina","Austria","Algeria","Jordan"],K:["Colombia","Portugal","Uzbekistan","Congo DR"],L:["England","Croatia","Ghana","Panama"]},tiebreaker:132}
+};
 const FORM_URL="#";
 
 const ESPN_SB="https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260611-20260719&limit=200";
@@ -316,7 +320,7 @@ function Leaderboard({standings,matches}){
         {isExp&&<div className="lb-exp">
           <div className="lb-exp-row"><span className="l">Group stage</span><span className="v u">{e.groupPts} pts</span></div>
           <div className="lb-exp-row"><span className="l">Knockout</span><span className="v u">{e.koPts} pts</span></div>
-          <div className="lb-exp-row"><span className="l">Champion pick</span><span className="v" style={{display:"flex",gap:6,alignItems:"center"}}>{e.champion?<><Flag team={e.champion} size="sm"/>{e.champion}</>:"—"}</span></div>
+          <div className="lb-exp-row"><span className="l">Group-stage goals (tiebreak)</span><span className="v">{e.tiebreaker!=null?e.tiebreaker:"—"}</span></div>
           <div className="lb-exp-row"><span className="l">Correct advancers</span><span className="v">{e.advCorrect}/24</span></div></div>}
       </div>;})}</div>
     <ScoringKey/></div>;
@@ -590,7 +594,7 @@ function computeStandings(picks,liveStandings,matches){
       predAdv.forEach(t=>{if(actAdv.includes(t)){groupPts+=SCORING.teamAdvances;advCorrect++;}});
       if(order.length===4&&order.every((t,i)=>t===an[i]))groupPts+=SCORING.exactOrderBonus;
     }
-    return{name,groupPts,koPts,total:groupPts+koPts,champion:p.champion,advCorrect};
+    return{name,groupPts,koPts,total:groupPts+koPts,champion:p.champion,advCorrect,tiebreaker:p.tiebreaker};
   }).sort((a,b)=>b.total-a.total);
 }
 function App(){
