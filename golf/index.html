@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,74 +20,56 @@ const { useState, useEffect, useCallback, useMemo } = React;
 const PARTICIPANTS = ["Kreag","Teej","Fjord","Farthead","Tony","Christian","Timmy","Dirk","Doug","Nate","Condel$","Willie","Nuble","Polaris","SOD"];
 
 const DEFAULT_ODDS = [
-  "Scottie Scheffler +345","Rory McIlroy +800","Jon Rahm +1300","Cameron Young +1500",
-  "Bryson DeChambeau +1700","Xander Schauffele +1850","Matt Fitzpatrick +1950","Ludvig Aberg +2000",
-  "Tommy Fleetwood +2600","Collin Morikawa +3500",
-  "Brooks Koepka +3900","Justin Rose +4300","Russell Henley +4600","Si Woo Kim +4700",
-  "Justin Thomas +4800","Robert MacIntyre +5300","Patrick Cantlay +5300","Viktor Hovland +5400",
-  "Tyrrell Hatton +5500","Jordan Spieth +5900","Sam Burns +6000","Hideki Matsuyama +6200",
-  "Adam Scott +6400","Rickie Fowler +7000","Chris Gotterup +7400","Patrick Reed +7400",
-  "Min Woo Lee +7800","Ben Griffin +8000","Sepp Straka +8400","Shane Lowry +9000",
-  "Akshay Bhatia +9200","Maverick McNealy +9200","Joaquin Niemann +9200","Jake Knapp +9200",
-  "Jason Day +9600","Kurt Kitayama +10000","J.J. Spaun +10000","Harris English +10500",
-  "Nicolai Hojgaard +11000","Gary Woodland +11000","David Puig +11000",
-  "Michael Thorbjornsen +12000","Jacob Bridgeman +12000","Keegan Bradley +12500",
-  "Corey Conners +14000","Alex Fitzpatrick +15000","Sungjae Im +15500",
-  "Sahith Theegala +15500","Harry Hall +15500","Alex Noren +16000",
-  "Thomas Detry +16500","Marco Penge +16500","Kristoffer Reitan +17000",
-  "Alex Smalley +17000","Wyndham Clark +17500","Sam Stevens +17500","Keith Mitchell +17500",
-  "Daniel Berger +18500","Ryan Gerard +20000","Nick Taylor +20000",
-  "Rasmus Hojgaard +21000","Dustin Johnson +21000","Pierceson Coody +23000",
-  "Aaron Rai +24000","Jordan Smith +24000","Angel Ayora +24000","Bud Cauley +25000",
-  "Matt McCarty +26000","Jayden Schaper +26000","Brian Harman +27000",
-  "Taylor Pendrith +27000","Ryan Fox +27000","J.T. Poston +27000",
-  "Cameron Smith +29000","Ryo Hisatsune +29000","Michael Kim +29000",
-  "Max Homa +29000","Denny McCarthy +29000","Tom McKibbin +30000",
-  "Rico Hoey +32000","Matt Wallace +32500","Ricky Castillo +33000","Haotong Li +33000",
-  "Michael Brennan +34000","Max Greyserman +36000","Stephan Jaeger +37500",
-  "Christiaan Bezuidenhout +37500","Rasmus Neergaard-Petersen +39000",
-  "Aldrich Potgieter +40000","Andrew Novak +42000","Patrick Rodgers +42500",
-  "Daniel Hillier +42500","Max McGreevy +46000","Billy Horschel +48000",
-  "Chris Kirk +48000","Ian Holt +49000","Casey Jarvis +49000",
-  "William Mouw +50000","Steven Fisk +50000","John Parry +50000",
-  "Nico Echavarria +52500","Garrick Higgo +52500","John Keefer +55000",
-  "Matthias Schmid +57500","Austin Smotherman +57500","Sami Valimaki +60000",
-  "Andrew Putnam +60000","Lucas Glover +62500","Daniel Brown +62500",
-  "Jhonattan Vegas +75000","Emiliano Grillo +80000","Mikael Lindberg +85000",
-  "Adrien Saddier +100000","Bernd Wiesberger +100000","Elvis Smylie +110000",
-  "Stewart Cink +130000","Kota Kaneko +130000","David Lipsky +150000",
-  "Chandler Blanchet +150000","Andy Sullivan +150000","Joe Highsmith +180000",
-  "Adam Schenk +200000","Travis Smyth +200000","Davis Riley +225000",
-  "Martin Kaymer +400000","Brian Campbell +400000","Padraig Harrington +450000",
-  "Kazuki Higa +450000","Jordan Gumberg +450000","Ryan Vermeer +500000",
-  "Austin Hurt +500000","Tyler Collet +500000","Timothy Wiseman +500000",
-  "Shaun Micheel +500000","Y.E. Yang +500000","Michael Block +500000",
-  "Mark Geddes +500000","Luke Donald +500000","Bryce Fisher +500000",
-  "Jimmy Walker +500000","Jason Dufner +500000","Jesse Droemer +500000",
-  "Jared Jones +500000","Garrett Sapp +500000","Francisco Bide +500000",
-  "Zach Haynes +500000","Paul McClure +500000","Derek Berg +500000",
-  "Chris Gabriele +500000","Braden Shattuck +500000","Ben Polland +500000",
-  "Ben Kern +50000"
+  "Scottie Scheffler +455","Rory McIlroy +940","Jon Rahm +1025","Xander Schauffele +1850",
+  "Cameron Young +2000","Matt Fitzpatrick +2500","Tommy Fleetwood +2500","Ludvig Aberg +2600",
+  "Bryson DeChambeau +2700","Brooks Koepka +2900","Collin Morikawa +3300","Sam Burns +3700",
+  "Russell Henley +3700","Si Woo Kim +3900","Justin Rose +4200","Wyndham Clark +4200",
+  "Chris Gotterup +4400","Justin Thomas +4400","Tyrrell Hatton +4500","Patrick Cantlay +4500",
+  "Patrick Reed +4800","Viktor Hovland +5300","J.J. Spaun +6000","Hideki Matsuyama +6400",
+  "Jordan Spieth +6800","Joaquin Niemann +6800","Ben Griffin +7200","Min Woo Lee +7200",
+  "Maverick McNealy +7400","Adam Scott +7400","Shane Lowry +7400","Kurt Kitayama +7800",
+  "Robert MacIntyre +7800","Harris English +8600","Kristoffer Reitan +8800","Jake Knapp +9400",
+  "David Puig +9400","Nicolai Hojgaard +9600","Alex Smalley +10000","Alex Noren +10000",
+  "Aaron Rai +10000","Sepp Straka +10500","Ryan Gerard +11000","Rickie Fowler +11000",
+  "Gary Woodland +11500","Alex Fitzpatrick +12000","Jason Day +13000","Akshay Bhatia +13500",
+  "Keegan Bradley +14000","Keith Mitchell +15000","Jacob Bridgeman +15500","Jackson Koivun +15500",
+  "Dustin Johnson +16000","Cameron Smith +16000","Sahith Theegala +16000","Harry Hall +16500",
+  "Nick Taylor +16500","Corey Conners +18000","Pierceson Coody +18500","Sudarshan Yellamaraju +19000",
+  "Daniel Berger +20000","Sungjae Im +20000","Benjamin James +21000","Davis Thompson +23000",
+  "Brian Harman +23000","Tom Kim +23000","Ryo Hisatsune +23000","Max Greyserman +25000",
+  "Lucas Herbert +25000","Jayden Schaper +25000","Ryan Fox +25000","Jackson Suber +27000",
+  "Sam Stevens +27000","Michael Brennan +27000","Matt McCarty +28000","Carlos Ortiz +28000",
+  "Andrew Putnam +30000","Andrew Novak +31000","Michael Kim +31000","Adrien Dumont De Chassart +37000",
+  "John Keefer +38000","Preston Stout +42500","Patrick Rodgers +44000","John Parry +45000",
+  "Nico Echavarria +45000","Max McGreevy +45000","Matthias Schmid +45000","Chris Kirk +47000",
+  "William Mouw +52500","Nathan Kimsey +55000","Kevin Roy +62500","Cooper Dossey +70000",
+  "Emiliano Grillo +72500","Neal Shipley +72500","Billy Horschel +75000","Ben Kohles +77500",
+  "Laurie Canter +80000","Adrien Saddier +85000","Ugo Coussaud +85000","Chandler Phillips +110000",
+  "Matthew Jordan +110000","Caleb Surratt +125000","Zac Blair +125000","Cole Hammer +140000",
+  "Padraig Harrington +140000","Taylor Montgomery +190000","Niklas Norgaard +190000","Dylan Wu +200000",
+  "Alejandro Tosti +200000","Carl Yuan +225000","Ben Silverman +225000","Peter Uihlein +225000",
+  "Nick Hardy +225000","Arni Sveinsson +250000","Jimmy Stanger +250000","Ethan Fang +250000",
+  "Eric Lee +300000","James Nicholas +300000","Graeme McDowell +300000","Taihei Sato +300000",
+  "Ryder Cowan +300000","Jackson Herrington +350000","Greyson Leach +350000","Jackson Ormond +400000",
+  "Rocco Repetto +400000","Logan Reilly +400000","Mateo Pulcini +450000","Chase Kyes +450000",
+  "Marcelo Rozo +450000","Kaito Onishi +450000","Jake Peacock +450000","Jackson Van Paris +450000",
+  "J.B. Holmes +450000","Filippo Celli +450000","Manav Shah +500000","Jake Sollon +500000",
+  "Brandon Wu +500000","Brandon Holtz +500000","Ryuichi Oiwa +500000","Robbie Higgins +500000",
+  "Vaughn Harber +500000","Taek Soo Kim +500000","Matt Robles +500000","Marek Fleming +500000",
+  "Hamilton Coleman +500000","Mason Howell +500000"
 ];
 
 // ─── CURRENT TOURNAMENT PICKS ───
 // Update this for each tournament with submitted picks
 const PICKS_2026 = {
-  Polaris:{name:"Polaris",tiebreaker:-15,picks:["Scottie Scheffler +345","Rory McIlroy +800","Brooks Koepka +3900","Justin Rose +4300","Justin Thomas +4800","Gary Woodland +11000","Mikael Lindberg +85000"],timestamp:"2026-05-13T01:39:38"},
-  Teej:{name:"Teej",tiebreaker:-16,picks:["Scottie Scheffler +345","Cameron Young +1500","Brooks Koepka +3900","Tyrrell Hatton +5500","Chris Gotterup +7400","Jason Day +9600","J.J. Spaun +10000"],timestamp:"2026-05-13T22:38:32"},
-  Nuble:{name:"Nuble",tiebreaker:-16,picks:["Cameron Young +1500","Xander Schauffele +1850","Russell Henley +4600","Jordan Spieth +5900","Chris Gotterup +7400","Maverick McNealy +9200","J.J. Spaun +10000"],timestamp:"2026-05-13T23:28:34"},
-  Timmy:{name:"Timmy",tiebreaker:-16,picks:["Scottie Scheffler +345","Cameron Young +1500","Tyrrell Hatton +5500","Sam Burns +6000","Chris Gotterup +7400","Akshay Bhatia +9200","Gary Woodland +11000"],timestamp:"2026-05-14T00:59:13"},
-  Fjord:{name:"Fjord",tiebreaker:-16,picks:["Scottie Scheffler +345","Rory McIlroy +800","Brooks Koepka +3900","Jordan Spieth +5900","Rickie Fowler +7000","Akshay Bhatia +9200","Jacob Bridgeman +12000"],timestamp:"2026-05-14T02:46:28"},
-  Farthead:{name:"Farthead",tiebreaker:-16,picks:["Scottie Scheffler +345","Cameron Young +1500","Si Woo Kim +4700","Viktor Hovland +5400","Chris Gotterup +7400","Jason Day +9600","J.J. Spaun +10000"],timestamp:"2026-05-14T03:26:28"},
-  Kreag:{name:"Kreag",tiebreaker:-16,picks:["Scottie Scheffler +345","Xander Schauffele +1850","Brooks Koepka +3900","Patrick Cantlay +5300","Viktor Hovland +5400","Jason Day +9600","Nicolai Hojgaard +11000"],timestamp:"2026-05-14T13:03:38"},
-  Nate:{name:"Nate",tiebreaker:-17,picks:["Scottie Scheffler +345","Rory McIlroy +800","Justin Rose +4300","Tyrrell Hatton +5500","Chris Gotterup +7400","J.J. Spaun +10000","David Puig +11000"],timestamp:"2026-05-14T13:47:45"},
-  Tony:{name:"Tony",tiebreaker:-13,picks:["Scottie Scheffler +345","Rory McIlroy +800","Brooks Koepka +3900","Justin Rose +4300","Russell Henley +4600","Joaquin Niemann +9200","Jake Knapp +9200"],timestamp:"2026-05-14T14:45:42"}
+  // US Open picks will be added here once the Google Form responses come in
 };
 
 // Empty scores — will be populated live from ESPN once tournament starts Thursday
 // Scores loaded live from ESPN via Cloudflare Worker
 
 const POOL_HISTORY = [
+  {id:"2026-pga",name:"2026 PGA Championship",venue:"Aronimink Golf Club",status:"completed",champ:"Aaron Rai",champScore:-9,poolWinner:"Polaris",poolScore:-14,participants:["Polaris","Nate","Tony","Nuble","Timmy","Fjord","Farthead","Kreag","Teej"]},
   {id:"2026-m",name:"2026 Masters",venue:"Augusta National",status:"completed",champ:"Rory McIlroy",champScore:-12,poolWinner:"Polaris",poolScore:-41,participants:["Polaris","Christian","Teej","Kreag","Tony","SOD","Nuble","Farthead","Timmy","Nate","Dirk"]},
   {id:"2025-bo",name:"2025 British Open",venue:"Royal Portrush",status:"completed",champ:"Scottie Scheffler",champScore:-17,poolWinner:"Fjord",poolScore:-47,participants:["Polaris","Fjord","Kreag","Nuble","Timmy","Teej","Farthead"]},
   {id:"2025-us",name:"2025 US Open",venue:"Oakmont",status:"completed",champ:"J.J. Spaun",champScore:-1,poolWinner:"Nuble",poolScore:18,participants:["Timmy","Nuble","Teej","Farthead","Fjord","Polaris","Nate"]},
@@ -155,6 +136,7 @@ const POOL_RESULTS = {
   "2025-us": [{n:"Nuble",s:17,tb:-7},{n:"Farthead",s:25,tb:-3},{n:"Timmy",s:30,tb:-1},{n:"Polaris",s:33,tb:-4},{n:"Teej",s:null,tb:-6},{n:"Nate",s:null,tb:-6},{n:"Fjord",s:null,tb:-10}],
   "2025-bo": [{n:"Fjord",s:-31,tb:-8},{n:"Farthead",s:-30,tb:-14},{n:"Timmy",s:-25,tb:-12},{n:"Kreag",s:-24,tb:-13},{n:"Polaris",s:-23,tb:-10},{n:"Teej",s:-19,tb:-14},{n:"Nuble",s:-10,tb:-14}],
   "2026-m": [{n:"Polaris",s:-41,tb:-13},{n:"Christian",s:-37,tb:-16},{n:"Teej",s:-35,tb:-12},{n:"Kreag",s:-33,tb:-13},{n:"Tony",s:-29,tb:-12},{n:"SOD",s:-25,tb:-12},{n:"Nuble",s:-23,tb:-13},{n:"Farthead",s:-23,tb:-13},{n:"Timmy",s:-21,tb:-14},{n:"Nate",s:-17,tb:-11},{n:"Dirk",s:-4,tb:-11}],
+  "2026-pga": [{n:"Polaris",s:-14,tb:-15},{n:"Nate",s:-12,tb:-17},{n:"Tony",s:-10,tb:-13},{n:"Nuble",s:-9,tb:-16},{n:"Timmy",s:-5,tb:-16},{n:"Fjord",s:-4,tb:-16},{n:"Farthead",s:-4,tb:-16},{n:"Kreag",s:-3,tb:-16},{n:"Teej",s:-2,tb:-16}],
 };
 
 // ─── UTILS ───
@@ -412,8 +394,8 @@ function TeamsView({picks,scores}){
   </div>;}
 
 // ─── HOLE SCORECARD ───
-// Aronimink Golf Club pars (par 70)
-const AUGUSTA_PARS = [4,4,3,4,4,3,4,5,4,4,3,4,4,4,5,3,4,4];
+// Shinnecock Hills Golf Club pars (par 70)
+const AUGUSTA_PARS = [4,3,4,4,5,4,3,4,4,4,3,4,4,4,4,5,3,4];
 const HOLE_NAMES = ["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18"];
 
 function HoleScorecard({holeScores,coursePars,playerThru}){
@@ -866,7 +848,7 @@ async function proxyFetch(url) {
 }
 
 // ─── PGA TOUR API CONFIG ───
-const PGAT_TOURNAMENT_ID = "R2026033";
+const PGAT_TOURNAMENT_ID = "R2026026";
 
 async function pgatFetch(queryType, extraParams = {}) {
   if (!CF_WORKER_URL || CF_WORKER_URL.includes("YOUR-SUBDOMAIN")) return null;
@@ -1123,7 +1105,7 @@ function parseESPNMerged(headerData, scoreboardData) {
 function App(){
   const[view,setView]=useState("leaderboard");const[isAdmin,setIsAdmin]=useState(false);
   const tiers=useMemo(()=>buildTiers(DEFAULT_ODDS),[]);
-  const[tournament,setTournament]=useState({id:`${TOURNAMENT_YEAR}-pga`,name:`${TOURNAMENT_YEAR} PGA Championship`,status:"active",course:"Aronimink Golf Club",startDate:"2026-05-14",firstTeeTime:"2026-05-14T12:00:00Z",tiersLocked:false,tiers});
+  const[tournament,setTournament]=useState({id:`${TOURNAMENT_YEAR}-us`,name:`${TOURNAMENT_YEAR} US Open`,status:"active",course:"Shinnecock Hills Golf Club",startDate:"2026-06-18",firstTeeTime:"2026-06-18T11:00:00Z",tiersLocked:false,tiers});
   const[picks,setPicks]=useState(PICKS_2026);const[scores,setScores]=useState({});const[history]=useState(POOL_HISTORY);
   const[coursePars,setCoursePars]=useState(null);
   const[prevPositions,setPrevPositions]=useState({});
@@ -1486,7 +1468,7 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
     {view==="leaderboard"&&<LeaderboardView tournament={tournament} picks={picks} scores={scores} lastUpdated={lastUpdated} onRefresh={handleRefresh} liveStatus={liveStatus} autoRefresh={autoRefresh} setAutoRefresh={setAutoRefresh}/>}
     {view==="teams"&&<TeamsView picks={picks} scores={scores}/>}
     {view==="scoreboard"&&<ScoreboardView tournament={tournament} scores={scores} picks={picks} lastUpdated={lastUpdated} onRefresh={handleRefresh} liveStatus={liveStatus} autoRefresh={autoRefresh} setAutoRefresh={setAutoRefresh} coursePars={coursePars} prevPositions={prevPositions}/>}
-    {view==="picks"&&<PicksFormLink tournament={tournament} formUrl="https://forms.gle/dB6mkwjzMdHeqD2c6" picks={picks} participants={PARTICIPANTS}/>}
+    {view==="picks"&&<PicksFormLink tournament={tournament} formUrl="https://forms.gle/i6p4MJyXcXCcmxiM6" picks={picks} participants={PARTICIPANTS}/>}
     {/* Future: in-app pick submission — {view==="picks"&&<PicksView tournament={tournament} tiers={tiers} existingPicks={picks} onSubmit={onPick} participants={PARTICIPANTS}/>} */}
     {view==="history"&&<HistoryView history={history}/>}
     {view==="admin"&&<AdminView tournament={tournament} picks={picks} scores={scores}
