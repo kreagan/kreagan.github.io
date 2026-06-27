@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -314,6 +315,39 @@ function parseLeaders(data){
   }catch(e){}
   return out;
 }
+// Build leader boards by tallying goal/assist/card events from completed match summaries.
+// Returns {goals:{label,leaders:[{name,team,value}]}, assists:{...}, yellowCards:{...}}
+function aggregateStatsFromSummaries(summaries){
+  const goals={},assists={},yellows={},reds={};
+  const bump=(map,name,team,n=1)=>{if(!name)return;const k=name+"|"+team;map[k]=map[k]||{name,team,value:0};map[k].value+=n;};
+  summaries.forEach(sum=>{
+    if(!sum)return;
+    const evs=sum.keyEvents||sum.details||[];
+    evs.forEach(e=>{
+      const type=(e.type?.text||e.type?.name||e.type?.id||"").toString().toLowerCase();
+      const teamNm=e.team?.displayName||e.team?.name||"";
+      const ath=e.athletesInvolved?.[0]||e.participants?.[0]?.athlete||{};
+      const who=ath.displayName||ath.shortName||"";
+      const teamApp=NAME_ALIASES_REV[teamNm]||teamNm;
+      if(/own goal/.test(type)){/* skip own goals for scorer tally */}
+      else if(/goal/.test(type)||/penalty.*scored/.test(type)){
+        bump(goals,who,teamApp,1);
+        // assist if present as second athlete
+        const a2=e.athletesInvolved?.[1];
+        if(a2&&(a2.displayName||a2.shortName))bump(assists,a2.displayName||a2.shortName,teamApp,1);
+      }
+      else if(/yellow/.test(type))bump(yellows,who,teamApp,1);
+      else if(/red/.test(type))bump(reds,who,teamApp,1);
+    });
+  });
+  const toList=m=>Object.values(m).sort((a,b)=>b.value-a.value).slice(0,15);
+  const out={};
+  if(Object.keys(goals).length)out.goals={label:"⚽ Top Scorers — Golden Boot Race",leaders:toList(goals)};
+  if(Object.keys(assists).length)out.assists={label:"🅰️ Top Assists",leaders:toList(assists)};
+  if(Object.keys(yellows).length)out.yellowCards={label:"🟨 Most Yellow Cards",leaders:toList(yellows)};
+  if(Object.keys(reds).length)out.redCards={label:"🟥 Red Cards",leaders:toList(reds)};
+  return out;
+}
 function parseStandings(data){
   // ESPN /apis/v2 standings: children[] = groups, each with .standings.entries[]
   // Returns { A:[{name,points,gd,played,pos}, ...sorted], B:[...], ... } keyed by group letter
@@ -360,6 +394,7 @@ const STAT_CATEGORIES=[
   {keys:["goals","totalGoals","goalsScored"],label:"⚽ Top Scorers — Golden Boot Race",unit:"goals"},
   {keys:["assists","totalAssists","goalAssists"],label:"🅰️ Top Assists",unit:"assists"},
   {keys:["yellowCards","totalYellowCards"],label:"🟨 Most Yellow Cards",unit:"cards"},
+  {keys:["redCards","totalRedCards"],label:"🟥 Red Cards",unit:"cards"},
   {keys:["saves","totalSaves"],label:"🧤 Most Saves",unit:"saves"}
 ];
 
@@ -782,10 +817,27 @@ function App(){
       all=Object.values(byId);
     }
     if(all.length)setMatches(all);
-    if(ld)setLeaders(parseLeaders(ld));
     if(st){const parsed=parseStandings(st);if(parsed)setStandings(parsed);}
     setFlagsReady(x=>x+1);
     setLastUpdated(Date.now());setLiveStatus("idle");
+
+    // Build stats from ESPN leaders endpoint; if empty, aggregate from completed/live match summaries
+    let stats=ld?parseLeaders(ld):{};
+    if(!stats||Object.keys(stats).length===0){
+      const relevant=all.filter(m=>m.state==="post"||m.state==="in").slice(0,64);
+      if(relevant.length){
+        const sums=[];
+        // fetch in small batches to be gentle on the proxy
+        for(let i=0;i<relevant.length;i+=6){
+          const batch=relevant.slice(i,i+6);
+          const res=await Promise.all(batch.map(m=>proxyFetch(ESPN_SUMMARY(m.id)).catch(()=>null)));
+          res.forEach(r=>r&&sums.push(r));
+        }
+        const agg=aggregateStatsFromSummaries(sums);
+        if(Object.keys(agg).length)stats=agg;
+      }
+    }
+    if(stats&&Object.keys(stats).length)setLeaders(stats);
   },[]);
   useEffect(()=>{fetchLive();const id=setInterval(fetchLive,60000);return()=>clearInterval(id);},[fetchLive]);
   return <>
