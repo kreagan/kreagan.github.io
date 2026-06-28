@@ -827,7 +827,7 @@ function PicksView({allPicks,onSubmitted}){
     setStatus("saving");setErrMsg("");
     const champ=champion||finalWinner||"";
     try{
-      const res=await fetch(PICKS_API,{method:"POST",body:JSON.stringify({name:name.trim(),picks,champion:champ,tbGoals})});
+      const res=await fetch(PICKS_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({name:name.trim(),picks,champion:champ,tbGoals})});
       const j=await res.json().catch(()=>({ok:false,error:"Bad response"}));
       if(j.ok){setStatus("ok");onSubmitted&&onSubmitted();}else{setStatus("err");setErrMsg(j.error||"Save failed");}
     }catch(e){setStatus("err");setErrMsg("Network error — check the backend URL and try again.");}
