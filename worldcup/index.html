@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -113,6 +114,25 @@ button{font-family:inherit}
 .tie-split .col.b h6{color:var(--gold)}
 .tie-split .col .names{font-family:var(--fm);font-size:11px;color:var(--tx);line-height:1.7}
 .tie-split .col .none{color:var(--dim)}
+
+/* visual bracket */
+.vb-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 4px;padding:0 16px 8px}
+.vb{display:flex;min-width:600px;gap:0}
+.vb-round{display:flex;flex-direction:column;min-width:118px;flex:1;padding:0 5px}
+.vb-rh{flex:0 0 auto;text-align:center;font-family:var(--fm);font-size:10px;font-weight:700;color:var(--gold);letter-spacing:.5px;padding:4px 0 8px;text-transform:uppercase}
+.vb-body{flex:1;display:flex;flex-direction:column;justify-content:space-around}
+.vb-match{background:var(--panel);border:1px solid var(--bd);border-radius:8px;overflow:hidden;position:relative}
+.vb-round:not(:last-child) .vb-match::after{content:"";position:absolute;right:-5px;top:50%;width:5px;height:1px;background:var(--bd)}
+.vb-round:not(:first-child) .vb-match::before{content:"";position:absolute;left:-5px;top:50%;width:5px;height:1px;background:var(--bd)}
+.vb-team{display:flex;align-items:center;gap:5px;padding:5px 7px;font-size:12px}
+.vb-team+.vb-team{border-top:1px solid rgba(255,255,255,.05)}
+.vb-team .c{font-family:var(--fm);font-weight:700;font-size:11px}
+.vb-team.win{background:rgba(60,228,146,.12)}
+.vb-team.win .c{color:var(--grn)}
+.vb-team.out{opacity:.45}
+.vb-champ{display:flex;align-items:center;justify-content:space-between;margin:4px 16px 0;padding:14px 18px;background:linear-gradient(135deg,var(--pitch),var(--panel));border:1px solid var(--gold);border-radius:14px}
+.vb-champ-l{font-family:var(--fm);font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:.5px}
+.vb-champ-v{display:flex;align-items:center;gap:8px;font-family:var(--fx);font-weight:800;font-size:18px}
 
 /* scores */
 .match{background:var(--panel);border:1px solid var(--bd);border-radius:14px;margin:10px 16px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .1s}
@@ -487,36 +507,113 @@ function ScoringKey(){
 
 // ---- BRACKET (everyone's picks per tie) ----
 function BracketView({allPicks,bracket}){
+  const [mode,setMode]=useState("list");
   const [round,setRound]=useState("R32");
+  const [who,setWho]=useState("everyone"); // "everyone" or a player name
   const names=Object.keys(allPicks);
   const rd=ROUNDS.find(r=>r.key===round);
   return <div>
-    <Banner title="Bracket" sub="See who everyone picked in each tie"/>
-    <div className="pk-tabs">{ROUNDS.map(r=><button key={r.key} className={`pk-tab ${round===r.key?"on":""}`} onClick={()=>setRound(r.key)}>{r.key}</button>)}</div>
-    {rd.ties.map(t=>{
-      const [a,b]=bracket.teamsByTie[t.id]||[null,null];
-      const winner=bracket.winnerByTie[t.id];
-      const aPickers=names.filter(n=>allPicks[n].picks?.[t.id]&&toApp(allPicks[n].picks[t.id])===toApp(a));
-      const bPickers=names.filter(n=>allPicks[n].picks?.[t.id]&&toApp(allPicks[n].picks[t.id])===toApp(b));
-      return <div className="tie" key={t.id}>
-        <div className="tie-h"><span>{rd.label}</span>{winner?<span className="tie-status ft">{winner} won</span>:<span>{a&&b?"to be played":"awaiting teams"}</span>}</div>
-        <div className={`tie-side ${winner&&toApp(winner)===toApp(a)?"win":winner?"out":""}`}>
-          <Flag team={a}/><span className="nm">{a||"TBD"}</span>{a&&SEED[a]&&<span className="seedtag">{seedLabel(a)}</span>}
-        </div>
-        <div className={`tie-side ${winner&&toApp(winner)===toApp(b)?"win":winner?"out":""}`}>
-          <Flag team={b}/><span className="nm">{b||"TBD"}</span>{b&&SEED[b]&&<span className="seedtag">{seedLabel(b)}</span>}
-        </div>
-        {names.length>0&&(a||b)&&<div className="tie-split">
-          <div className="col a"><h6><Flag team={a} size="sm"/>{a||"TBD"} · {aPickers.length}</h6>
-            <div className="names">{aPickers.length?aPickers.map(n=><div key={n} style={winner&&toApp(winner)===toApp(a)?{color:"var(--grn)"}:{}}>{n}</div>):<span className="none">—</span>}</div></div>
-          <div className="col b"><h6><Flag team={b} size="sm"/>{b||"TBD"} · {bPickers.length}</h6>
-            <div className="names">{bPickers.length?bPickers.map(n=><div key={n} style={winner&&toApp(winner)===toApp(b)?{color:"var(--grn)"}:{}}>{n}</div>):<span className="none">—</span>}</div></div>
-        </div>}
-      </div>;
-    })}
+    <Banner title="Bracket" sub={mode==="visual"?"The actual bracket — both sides to the final":who==="everyone"?"See who everyone picked in each tie":`${who}'s predicted bracket`}/>
+    <div className="pk-tabs" style={{marginBottom:2}}>
+      <button className={`pk-tab ${mode==="list"?"on":""}`} onClick={()=>setMode("list")}>☰ List</button>
+      <button className={`pk-tab ${mode==="visual"?"on":""}`} onClick={()=>setMode("visual")}>🗺 Visual</button>
+    </div>
+    {mode==="visual"?<VisualBracket bracket={bracket}/>:<>
+    {names.length>0&&<div className="pk-tabs" style={{marginTop:2}}>
+      <button className={`pk-tab ${who==="everyone"?"on":""}`} onClick={()=>setWho("everyone")}>Everyone</button>
+      {names.map(n=><button key={n} className={`pk-tab ${who===n?"on":""}`} onClick={()=>setWho(n)}>{n}</button>)}
+    </div>}
+    {who==="everyone"?<>
+      <div className="pk-tabs">{ROUNDS.map(r=><button key={r.key} className={`pk-tab ${round===r.key?"on":""}`} onClick={()=>setRound(r.key)}>{r.key}</button>)}</div>
+      {rd.ties.map(t=>{
+        const [a,b]=bracket.teamsByTie[t.id]||[null,null];
+        const winner=bracket.winnerByTie[t.id];
+        const aPickers=names.filter(n=>allPicks[n].picks?.[t.id]&&toApp(allPicks[n].picks[t.id])===toApp(a));
+        const bPickers=names.filter(n=>allPicks[n].picks?.[t.id]&&toApp(allPicks[n].picks[t.id])===toApp(b));
+        return <div className="tie" key={t.id}>
+          <div className="tie-h"><span>{rd.label}</span>{winner?<span className="tie-status ft">{winner} won</span>:<span>{a&&b?"to be played":"awaiting teams"}</span>}</div>
+          <div className={`tie-side ${winner&&toApp(winner)===toApp(a)?"win":winner?"out":""}`}>
+            <Flag team={a}/><span className="nm">{a||"TBD"}</span>{a&&SEED[a]&&<span className="seedtag">{seedLabel(a)}</span>}
+          </div>
+          <div className={`tie-side ${winner&&toApp(winner)===toApp(b)?"win":winner?"out":""}`}>
+            <Flag team={b}/><span className="nm">{b||"TBD"}</span>{b&&SEED[b]&&<span className="seedtag">{seedLabel(b)}</span>}
+          </div>
+          {names.length>0&&(a||b)&&<div className="tie-split">
+            <div className="col a"><h6><Flag team={a} size="sm"/>{a||"TBD"} · {aPickers.length}</h6>
+              <div className="names">{aPickers.length?aPickers.map(n=><div key={n} style={winner&&toApp(winner)===toApp(a)?{color:"var(--grn)"}:{}}>{n}</div>):<span className="none">—</span>}</div></div>
+            <div className="col b"><h6><Flag team={b} size="sm"/>{b||"TBD"} · {bPickers.length}</h6>
+              <div className="names">{bPickers.length?bPickers.map(n=><div key={n} style={winner&&toApp(winner)===toApp(b)?{color:"var(--grn)"}:{}}>{n}</div>):<span className="none">—</span>}</div></div>
+          </div>}
+        </div>;
+      })}
+    </>:<PlayerBracket pick={allPicks[who]} bracket={bracket}/>}
+    </>}
+  </div>;
+}
+// One player's full predicted path, round by round, with correct/wrong marks once results land.
+function PlayerBracket({pick,bracket}){
+  if(!pick)return <div className="info">No bracket found for this player.</div>;
+  const myTeams=resolvePlayerBracket(pick.picks||{});
+  return <div>
+    <div className="info" style={{display:"flex",gap:8,alignItems:"center"}}><strong>Champion pick:</strong> {pick.champion?<><Flag team={pick.champion} size="sm"/>{pick.champion}</>:"—"}{pick.goldenBoot?<span style={{marginLeft:"auto",color:"var(--dim)",fontFamily:"var(--fm)",fontSize:12}}>⚽ {pick.goldenBoot}</span>:null}</div>
+    {ROUNDS.map(rd=><div key={rd.key}>
+      <div className="sectionhead">{rd.label}</div>
+      {rd.ties.map(t=>{
+        const [a,b]=myTeams[t.id]||[null,null];
+        const myPick=pick.picks?.[t.id];
+        const actualWinner=bracket.winnerByTie[t.id];
+        // status of this pick: correct (matches actual winner), wrong (actual winner differs), pending
+        let status="pending";
+        if(myPick&&actualWinner){status=toApp(myPick)===toApp(actualWinner)?"correct":"wrong";}
+        return <div className="tie" key={t.id}>
+          <div className="tie-h"><span>{rd.label}{a&&b?`: ${a} v ${b}`:""}</span>
+            {status==="correct"&&<span className="tie-status ft" style={{color:"var(--grn)"}}>✓ correct</span>}
+            {status==="wrong"&&<span className="tie-status ft" style={{color:"var(--red)"}}>✗ {actualWinner} won</span>}
+            {status==="pending"&&myPick&&<span style={{color:"var(--dim)"}}>picked</span>}
+          </div>
+          {myPick
+            ? <div className={`tie-side ${status==="correct"?"win":status==="wrong"?"out":""}`}>
+                <Flag team={myPick}/><span className="nm">{myPick}</span>
+                {SEED[myPick]&&<span className="seedtag">{seedLabel(myPick)}</span>}
+                <span style={{fontFamily:"var(--fm)",fontSize:11,color:"var(--dim)"}}>→ advances</span>
+              </div>
+            : <div className="tie-side" style={{color:"var(--dim)"}}><span className="nm">{a&&b?"No pick":"awaiting earlier rounds"}</span></div>}
+        </div>;
+      })}
+    </div>)}
   </div>;
 }
 function seedLabel(team){const s=SEED[team];return s===1?"1st in grp":s===2?"2nd in grp":s===3?"3rd in grp":"";}
+function teamCode(team){return team?(LOGO[team]||team.slice(0,3)).toUpperCase():"TBD";}
+function VisualBracket({bracket}){
+  // Linear bracket: R32 → Final. Top half (r32_1..8) → SF1, bottom half (r32_9..16) → SF2.
+  const H=16*52; // total bracket body height (16 R32 slots)
+  const champ=bracket.winnerByTie["final"];
+  return <div>
+    <div className="info" style={{marginTop:8,marginBottom:6}}>Scroll sideways to follow each path. The <strong>top half</strong> and <strong>bottom half</strong> meet in the Final. Winners advance in <span style={{color:"var(--grn)"}}>green</span>.</div>
+    <div className="vb-wrap">
+      <div className="vb" style={{height:H+"px"}}>
+        {ROUNDS.map(rd=>(
+          <div className="vb-round" key={rd.key}>
+            <div className="vb-rh">{rd.key}</div>
+            <div className="vb-body">
+              {rd.ties.map(t=>{
+                const [a,b]=bracket.teamsByTie[t.id]||[null,null];
+                const w=bracket.winnerByTie[t.id];
+                const aw=w&&toApp(w)===toApp(a),bw=w&&toApp(w)===toApp(b);
+                return <div className="vb-match" key={t.id}>
+                  <div className={`vb-team ${aw?"win":w?"out":""}`}><Flag team={a} size="sm"/><span className="c">{teamCode(a)}</span></div>
+                  <div className={`vb-team ${bw?"win":w?"out":""}`}><Flag team={b} size="sm"/><span className="c">{teamCode(b)}</span></div>
+                </div>;
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div className="vb-champ"><span className="vb-champ-l">🏆 Champion</span><span className="vb-champ-v">{champ?<><Flag team={champ} size="sm"/>{champ}</>:"TBD"}</span></div>
+  </div>;
+}
 
 // ---- SCORES ----
 function ScoresView({matches,lastUpdated,onRefresh,liveStatus}){
@@ -635,16 +732,42 @@ function StatsView({stats,matches,lastUpdated,onRefresh,liveStatus}){
 }
 
 // ---- PICKS (make + submit) ----
+// Given a player's picks {tieId:team}, resolve the two teams feeding each later-round tie.
+function resolvePlayerBracket(picks){
+  const teams={};
+  R32.forEach(t=>{teams[t.id]=[t.a,t.b];});
+  [R16,QF,SF,FINAL].forEach(rdTies=>rdTies.forEach(t=>{
+    const [f1,f2]=t.from;
+    teams[t.id]=[picks[f1]||null,picks[f2]||null];
+  }));
+  return teams;
+}
+// Remove downstream picks that are no longer valid after an upstream change.
+// Iterates until stable so a deep cascade (R16→QF→SF→Final) fully clears.
+function prunePicks(picks){
+  let out={...picks};
+  for(let pass=0;pass<5;pass++){
+    const teams=resolvePlayerBracket(out);
+    let changed=false;
+    [R16,QF,SF,FINAL].forEach(rdTies=>rdTies.forEach(t=>{
+      const [a,b]=teams[t.id];
+      const chosen=out[t.id];
+      if(chosen&&chosen!==a&&chosen!==b){delete out[t.id];changed=true;}
+    }));
+    if(!changed)break;
+  }
+  return out;
+}
+
 function PicksView({allPicks,onSubmitted}){
   const [name,setName]=useState("");
-  const [picks,setPicks]=useState({});       // {tieId: teamName}
+  const [picks,setPicks]=useState({});       // {tieId: teamName} across ALL rounds
   const [champion,setChampion]=useState("");
   const [boot,setBoot]=useState("");
   const [bootGoals,setBootGoals]=useState("");
-  const [status,setStatus]=useState(null);   // null | "saving" | "ok" | "err"
+  const [status,setStatus]=useState(null);
   const [errMsg,setErrMsg]=useState("");
 
-  // If the typed name matches an existing entry, prefill it for editing
   useEffect(()=>{
     const existing=allPicks[name.trim()];
     if(existing){setPicks(existing.picks||{});setChampion(existing.champion||"");setBoot(existing.goldenBoot||"");setBootGoals(existing.goldenBootGoals||"");}
@@ -657,49 +780,89 @@ function PicksView({allPicks,onSubmitted}){
   </div>;
   if(!PICKS_API||PICKS_API.includes("PASTE_YOUR")){
     return <div><Banner title="Make Your Picks" sub="Setup needed"/>
-      <div className="info">The picks backend isn't connected yet. Deploy the Google Apps Script and paste its URL into <strong>PICKS_API</strong> at the top of the file. Until then, picks can't be saved.</div></div>;
+      <div className="info">The picks backend isn't connected yet. Deploy the Google Apps Script and paste its URL into <strong>PICKS_API</strong> at the top of the file.</div></div>;
   }
 
-  const champOptions=R32.flatMap(t=>[t.a,t.b]).sort();
-  const r32Done=R32.filter(t=>picks[t.id]).length;
-  const canSubmit=name.trim()&&r32Done===16&&champion&&status!=="saving";
+  const teams=resolvePlayerBracket(picks);
+  // Pick a winner for a tie, then prune now-invalid downstream picks + champion
+  const choose=(tieId,team)=>{
+    setPicks(prev=>{
+      const next={...prev,[tieId]:team};
+      const pruned=prunePicks(next);
+      return pruned;
+    });
+  };
+  // When final pick changes, keep champion in sync only if still valid
+  useEffect(()=>{
+    const finalTeams=resolvePlayerBracket(picks)[FINAL[0].id]||[];
+    if(champion&&!finalTeams.includes(champion)&&finalTeams.filter(Boolean).length){
+      // champion no longer reachable; leave for user to re-pick
+    }
+  // eslint-disable-next-line
+  },[picks]);
+
+  // progress per round
+  const roundDone=k=>{const rd=ROUNDS.find(r=>r.key===k);return rd.ties.filter(t=>picks[t.id]).length;};
+  const allRoundsDone=ROUNDS.every(rd=>rd.ties.every(t=>picks[t.id]));
+  const finalTeams=teams[FINAL[0].id]||[];
+  const finalWinner=picks[FINAL[0].id];
+  // champion options: the team the player picked to win the final (auto), but allow explicit confirm
+  const champOptions=finalTeams.filter(Boolean);
+  const canSubmit=name.trim()&&allRoundsDone&&(finalWinner||champion)&&status!=="saving";
 
   const submit=async()=>{
     setStatus("saving");setErrMsg("");
+    const champ=champion||finalWinner||"";
     try{
-      const res=await fetch(PICKS_API,{method:"POST",body:JSON.stringify({name:name.trim(),picks,champion,goldenBoot:boot,goldenBootGoals:bootGoals})});
+      const res=await fetch(PICKS_API,{method:"POST",body:JSON.stringify({name:name.trim(),picks,champion:champ,goldenBoot:boot,goldenBootGoals:bootGoals})});
       const j=await res.json().catch(()=>({ok:false,error:"Bad response"}));
       if(j.ok){setStatus("ok");onSubmitted&&onSubmitted();}else{setStatus("err");setErrMsg(j.error||"Save failed");}
     }catch(e){setStatus("err");setErrMsg("Network error — check the backend URL and try again.");}
   };
 
+  const totalTies=ROUNDS.reduce((s,r)=>s+r.ties.length,0);
+  const totalDone=ROUNDS.reduce((s,r)=>s+r.ties.filter(t=>picks[t.id]).length,0);
+
   return <div>
-    <Banner title="Make Your Picks" sub="Pick all 16 Round-of-32 winners + champion"/>
-    {status==="ok"&&<div className="pf-banner ok">✓ Picks saved! You can edit anytime before lock by entering the same name.</div>}
+    <Banner title="Make Your Picks" sub="Fill out your full bracket — R32 all the way to the champion"/>
+    {status==="ok"&&<div className="pf-banner ok">✓ Bracket saved! Enter the same name anytime before lock to edit.</div>}
     {status==="err"&&<div className="pf-banner err">⚠ {errMsg}</div>}
 
     <div className="pf-field">
       <div className="pf-label">Your name</div>
       <input className="pf-input" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Kreag" />
-      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Use the same name to edit your existing entry.</div>
+      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Use the same name to edit your existing bracket. Progress: {totalDone}/{totalTies} picks.</div>
     </div>
 
-    <div className="sectionhead">Round of 32 — pick each winner <span className="cnt">{r32Done}/16</span></div>
-    {R32.map(t=><div className="pf-match" key={t.id}>
-      <div className="pf-match-h">{t.a} vs {t.b}</div>
-      {[t.a,t.b].map(team=><button key={team} className={`pf-opt ${picks[t.id]===team?"sel":""}`} onClick={()=>setPicks(p=>({...p,[t.id]:team}))}>
-        <Flag team={team}/><span className="nm">{team}</span><span className="seedtag">{seedLabel(team)}</span>{picks[t.id]===team&&<span className="check">✓</span>}
-      </button>)}
-    </div>)}
+    {ROUNDS.map(rd=>{
+      const done=roundDone(rd.key);
+      // a round is pickable once all its feeder ties are decided (R32 always pickable)
+      return <div key={rd.key}>
+        <div className="sectionhead">{rd.label} <span className="cnt">{done}/{rd.ties.length}</span></div>
+        {rd.ties.map(t=>{
+          const [a,b]=teams[t.id]||[null,null];
+          const ready=a&&b; // both feeder picks made
+          if(!ready)return <div className="pf-match" key={t.id}>
+            <div className="pf-match-h">{rd.label} matchup</div>
+            <div className="pf-opt" style={{cursor:"default",color:"var(--dim)"}}><span className="nm">Pick the earlier rounds first…</span></div>
+          </div>;
+          return <div className="pf-match" key={t.id}>
+            <div className="pf-match-h">{a} vs {b}</div>
+            {[a,b].map(team=><button key={team} className={`pf-opt ${picks[t.id]===team?"sel":""}`} onClick={()=>choose(t.id,team)}>
+              <Flag team={team}/><span className="nm">{team}</span><span className="seedtag">{seedLabel(team)}</span>{picks[t.id]===team&&<span className="check">✓</span>}
+            </button>)}
+          </div>;
+        })}
+      </div>;
+    })}
 
-    <div className="pf-field">
-      <div className="pf-label">🏆 Champion (winner of it all)</div>
-      <select className="pf-select" value={champion} onChange={e=>setChampion(e.target.value)}>
-        <option value="">Select champion…</option>
-        {champOptions.map(t=><option key={t} value={t}>{t}</option>)}
-      </select>
-      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>+16 bonus if correct. Pick anyone in the field.</div>
-    </div>
+    <div className="sectionhead">🏆 Champion</div>
+    {finalWinner
+      ? <div className="pf-match"><div className="pf-match-h">Your bracket champion</div>
+          <div className="pf-opt sel"><Flag team={finalWinner}/><span className="nm">{finalWinner}</span><span className="check">✓</span></div>
+          <div className="pf-prog" style={{padding:"8px 14px",textAlign:"left"}}>Auto-set from your Final pick. +16 bonus if correct.</div>
+        </div>
+      : <div className="info">Your champion is set automatically once you pick the Final winner above.</div>}
 
     <div className="pf-field">
       <div className="pf-label">⚽ Golden Boot — top scorer (tiebreaker)</div>
@@ -710,8 +873,8 @@ function PicksView({allPicks,onSubmitted}){
       <input className="pf-input" type="number" value={bootGoals} onChange={e=>setBootGoals(e.target.value)} placeholder="e.g. 7" />
     </div>
 
-    <button className="pf-submit" disabled={!canSubmit} onClick={submit}>{status==="saving"?"Saving…":"Submit picks"}</button>
-    {!canSubmit&&status!=="saving"&&<div className="pf-note">{!name.trim()?"Enter your name":r32Done<16?`Pick all 16 winners (${r32Done}/16 done)`:!champion?"Pick a champion":""}</div>}
+    <button className="pf-submit" disabled={!canSubmit} onClick={submit}>{status==="saving"?"Saving…":"Submit bracket"}</button>
+    {!canSubmit&&status!=="saving"&&<div className="pf-note">{!name.trim()?"Enter your name":!allRoundsDone?`Complete every round (${totalDone}/${totalTies} picks made)`:"Pick your Final winner"}</div>}
   </div>;
 }
 
