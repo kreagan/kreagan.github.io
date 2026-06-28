@@ -247,6 +247,8 @@ const { useState, useEffect, useMemo, useCallback } = React;
 // ══════════════════════════════════════════════════════════
 const PICKS_API = "https://script.google.com/macros/s/AKfycbyybBxbgIfuDs7eiomADbRD0jHK0r8e2F3zYooopHV7vp8FpDbgNVTEJqE_qBU7bSY2/exec"; // ends in /exec
 const PICKS_LOCKED = false; // set true once knockout picks should be frozen
+// Fixed participant list (same as the golf pool)
+const PARTICIPANTS = ["Kreag","Teej","Fjord","Farthead","Tony","Christian","Timmy","Dirk","Doug","Nate","Condel$","Willie","Nuble","Polaris","SOD"];
 
 const LOGO={"Mexico":"mex","South Africa":"rsa","South Korea":"kor","Czechia":"cze","Canada":"can","Switzerland":"sui","Qatar":"qat","Bosnia-Herzegovina":"bih","Brazil":"bra","Morocco":"mar","Scotland":"sco","Haiti":"hai","United States":"usa","Paraguay":"par","Australia":"aus","Türkiye":"tur","Germany":"ger","Ecuador":"ecu","Ivory Coast":"civ","Curaçao":"cuw","Netherlands":"ned","Japan":"jpn","Sweden":"swe","Tunisia":"tun","Belgium":"bel","Egypt":"egy","Iran":"irn","New Zealand":"nzl","Spain":"esp","Uruguay":"uru","Saudi Arabia":"ksa","Cape Verde":"cpv","France":"fra","Senegal":"sen","Norway":"nor","Iraq":"irq","Argentina":"arg","Austria":"aut","Algeria":"alg","Jordan":"jor","Portugal":"por","Colombia":"col","Congo DR":"cod","Uzbekistan":"uzb","England":"eng","Croatia":"cro","Ghana":"gha","Panama":"pan"};
 const EMOJI={"Mexico":"🇲🇽","South Africa":"🇿🇦","South Korea":"🇰🇷","Czechia":"🇨🇿","Canada":"🇨🇦","Switzerland":"🇨🇭","Qatar":"🇶🇦","Bosnia-Herzegovina":"🇧🇦","Brazil":"🇧🇷","Morocco":"🇲🇦","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Haiti":"🇭🇹","United States":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Türkiye":"🇹🇷","Germany":"🇩🇪","Ecuador":"🇪🇨","Ivory Coast":"🇨🇮","Curaçao":"🇨🇼","Netherlands":"🇳🇱","Japan":"🇯🇵","Sweden":"🇸🇪","Tunisia":"🇹🇳","Belgium":"🇧🇪","Egypt":"🇪🇬","Iran":"🇮🇷","New Zealand":"🇳🇿","Spain":"🇪🇸","Uruguay":"🇺🇾","Saudi Arabia":"🇸🇦","Cape Verde":"🇨🇻","France":"🇫🇷","Senegal":"🇸🇳","Norway":"🇳🇴","Iraq":"🇮🇶","Argentina":"🇦🇷","Austria":"🇦🇹","Algeria":"🇩🇿","Jordan":"🇯🇴","Portugal":"🇵🇹","Colombia":"🇨🇴","Congo DR":"🇨🇩","Uzbekistan":"🇺🇿","England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦"};
@@ -481,7 +483,7 @@ function Leaderboard({allPicks,bracket}){
   const names=Object.keys(allPicks);
   const entries=useMemo(()=>names.map(n=>{
     const s=scorePlayer(allPicks[n],bracket);
-    return {name:n,...s,champion:allPicks[n].champion};
+    return {name:n,...s,champion:allPicks[n].champion,tbGoals:allPicks[n].tbGoals};
   }).sort((a,b)=>b.total-a.total),[allPicks,bracket]);
 
   if(names.length===0)return <div>
@@ -501,6 +503,7 @@ function Leaderboard({allPicks,bracket}){
           <span className="lb-pts">{e.total}<small>PTS</small></span></div>
         {isExp&&<div className="lb-exp">
           <div className="lb-exp-row"><span className="l">Champion pick</span><span className="v" style={{display:"flex",gap:6,alignItems:"center"}}>{e.champion?<><Flag team={e.champion} size="sm"/>{e.champion}</>:"—"}</span></div>
+          <div className="lb-exp-row"><span className="l">Tiebreaker — knockout goals</span><span className="v">{e.tbGoals!=null&&e.tbGoals!==""?e.tbGoals:"—"}</span></div>
           <div className="rnd-grid">
             {ROUNDS.map(rd=>{const v=e.perRound[rd.key];return <div key={rd.key} className={`rnd-cell ${v>0?"pos":"zero"}`}><span className="rc-l">{rd.key}</span><span className="rc-v">{v}</span></div>;})}
           </div></div>}
@@ -566,7 +569,7 @@ function PlayerBracket({pick,bracket}){
   if(!pick)return <div className="info">No bracket found for this player.</div>;
   const myTeams=resolvePlayerBracket(pick.picks||{});
   return <div>
-    <div className="info" style={{display:"flex",gap:8,alignItems:"center"}}><strong>Champion pick:</strong> {pick.champion?<><Flag team={pick.champion} size="sm"/>{pick.champion}</>:"—"}{pick.goldenBoot?<span style={{marginLeft:"auto",color:"var(--dim)",fontFamily:"var(--fm)",fontSize:12}}>⚽ {pick.goldenBoot}</span>:null}</div>
+    <div className="info" style={{display:"flex",gap:8,alignItems:"center"}}><strong>Champion pick:</strong> {pick.champion?<><Flag team={pick.champion} size="sm"/>{pick.champion}</>:"—"}{pick.tbGoals!=null&&pick.tbGoals!==""?<span style={{marginLeft:"auto",color:"var(--dim)",fontFamily:"var(--fm)",fontSize:12}}>⚽ {pick.tbGoals} goals (TB)</span>:null}</div>
     {ROUNDS.map(rd=><div key={rd.key}>
       <div className="sectionhead">{rd.label}</div>
       {rd.ties.map(t=>{
@@ -738,7 +741,7 @@ function StatsView({stats,matches,lastUpdated,onRefresh,liveStatus}){
       return <div className="grp" key={key}><div className="grp-h"><span>{label}</span></div>
         {found.leaders.slice(0,10).map((l,i)=><div className="grp-team" key={i}><span className="rank">{i+1}</span>{l.team&&<Flag team={l.team} size="sm"/>}<span className="nm">{l.name}<span style={{color:"var(--dim)",fontFamily:"var(--fm)",fontSize:11,marginLeft:7}}>{l.team}</span></span><span className="pts">{l.value}</span></div>)}
       </div>;})}
-    <div className="info">The <strong>Golden Boot winner</strong> and their <strong>total goals</strong> are the pool tiebreaker.</div>
+    <div className="info">The <strong>tiebreaker</strong> is total goals scored in the knockout stage — closest guess wins.</div>
   </div>;
 }
 
@@ -774,14 +777,13 @@ function PicksView({allPicks,onSubmitted}){
   const [name,setName]=useState("");
   const [picks,setPicks]=useState({});       // {tieId: teamName} across ALL rounds
   const [champion,setChampion]=useState("");
-  const [boot,setBoot]=useState("");
-  const [bootGoals,setBootGoals]=useState("");
+  const [tbGoals,setTbGoals]=useState("");   // tiebreaker: total goals in knockout stage
   const [status,setStatus]=useState(null);
   const [errMsg,setErrMsg]=useState("");
 
   useEffect(()=>{
     const existing=allPicks[name.trim()];
-    if(existing){setPicks(existing.picks||{});setChampion(existing.champion||"");setBoot(existing.goldenBoot||"");setBootGoals(existing.goldenBootGoals||"");}
+    if(existing){setPicks(existing.picks||{});setChampion(existing.champion||"");setTbGoals(existing.tbGoals!=null?existing.tbGoals:"");}
   // eslint-disable-next-line
   },[name]);
 
@@ -825,7 +827,7 @@ function PicksView({allPicks,onSubmitted}){
     setStatus("saving");setErrMsg("");
     const champ=champion||finalWinner||"";
     try{
-      const res=await fetch(PICKS_API,{method:"POST",body:JSON.stringify({name:name.trim(),picks,champion:champ,goldenBoot:boot,goldenBootGoals:bootGoals})});
+      const res=await fetch(PICKS_API,{method:"POST",body:JSON.stringify({name:name.trim(),picks,champion:champ,tbGoals})});
       const j=await res.json().catch(()=>({ok:false,error:"Bad response"}));
       if(j.ok){setStatus("ok");onSubmitted&&onSubmitted();}else{setStatus("err");setErrMsg(j.error||"Save failed");}
     }catch(e){setStatus("err");setErrMsg("Network error — check the backend URL and try again.");}
@@ -841,8 +843,11 @@ function PicksView({allPicks,onSubmitted}){
 
     <div className="pf-field">
       <div className="pf-label">Your name</div>
-      <input className="pf-input" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Kreag" />
-      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Use the same name to edit your existing bracket. Progress: {totalDone}/{totalTies} picks.</div>
+      <select className="pf-select" value={name} onChange={e=>setName(e.target.value)}>
+        <option value="">Select your name…</option>
+        {PARTICIPANTS.map(n=><option key={n} value={n}>{n}</option>)}
+      </select>
+      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Pick your name to start or edit your bracket. Progress: {totalDone}/{totalTies} picks.</div>
     </div>
 
     {ROUNDS.map(rd=>{
@@ -884,12 +889,9 @@ function PicksView({allPicks,onSubmitted}){
       : <div className="info">Your champion is set automatically once you pick the Final winner above.</div>}
 
     <div className="pf-field">
-      <div className="pf-label">⚽ Golden Boot — top scorer (tiebreaker)</div>
-      <input className="pf-input" value={boot} onChange={e=>setBoot(e.target.value)} placeholder="e.g. Kylian Mbappé" />
-    </div>
-    <div className="pf-field">
-      <div className="pf-label">Golden Boot goals (tiebreaker)</div>
-      <input className="pf-input" type="number" value={bootGoals} onChange={e=>setBootGoals(e.target.value)} placeholder="e.g. 7" />
+      <div className="pf-label">⚽ Tiebreaker — total goals scored in the knockout stage</div>
+      <input className="pf-input" type="number" value={tbGoals} onChange={e=>setTbGoals(e.target.value)} placeholder="e.g. 140" />
+      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Your best guess at total goals across all knockout matches (R32 → Final). Closest wins ties.</div>
     </div>
 
     <button className="pf-submit" disabled={!canSubmit} onClick={submit}>{status==="saving"?"Saving…":"Submit bracket"}</button>
