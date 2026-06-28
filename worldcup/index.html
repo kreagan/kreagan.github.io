@@ -345,7 +345,7 @@ const SCORING={knockout:{R32:4,R16:8,QF:16,SF:24,F:32},champion:16,underdogMulti
 // ══════════════════════════════════════════════════════════
 //  DATA — ESPN public API via shared Cloudflare Worker proxy
 // ══════════════════════════════════════════════════════════
-const ESPN_SB="https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260628-20260719&limit=200";
+const ESPN_SB="https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260611-20260719&limit=200";
 const ESPN_SB_TODAY="https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
 const ESPN_TEAMS="https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/teams";
 const ESPN_SUMMARY=id=>`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${id}`;
@@ -995,7 +995,7 @@ function App(){
     if(all.length)setMatches(all);
     setFlagsReady(x=>x+1);setLastUpdated(Date.now());setLiveStatus("idle");
     // stats from completed/live summaries
-    const rel=all.filter(m=>m.state==="post"||m.state==="in").slice(0,40);
+    const rel=all.filter(m=>m.state==="post"||m.state==="in").slice(0,104);
     if(rel.length){const sums=[];for(let i=0;i<rel.length;i+=6){const b=rel.slice(i,i+6);const r=await Promise.all(b.map(m=>proxyFetch(ESPN_SUMMARY(m.id)).catch(()=>null)));r.forEach(x=>x&&sums.push(x));}const agg=aggregateStats(sums);if(Object.keys(agg).filter(k=>k!=="_totals").length||agg._totals.corners)setStats(agg);}
   },[]);
 
