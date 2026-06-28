@@ -247,6 +247,11 @@ const { useState, useEffect, useMemo, useCallback } = React;
 // ══════════════════════════════════════════════════════════
 const PICKS_API = "https://script.google.com/macros/s/AKfycbyybBxbgIfuDs7eiomADbRD0jHK0r8e2F3zYooopHV7vp8FpDbgNVTEJqE_qBU7bSY2/exec"; // ends in /exec
 const PICKS_LOCKED = false; // set true once knockout picks should be frozen
+// Everyone's picks stay hidden from other players until the first knockout match kicks off,
+// so nobody is influenced by others' brackets. You always see your OWN picks.
+// Set to the first R32 kickoff (ISO, UTC). Adjust if needed.
+const PICKS_REVEAL_TIME = new Date("2026-06-28T19:00:00Z");
+const picksRevealed = () => Date.now() >= PICKS_REVEAL_TIME.getTime();
 // Fixed participant list (same as the golf pool)
 const PARTICIPANTS = ["Kreag","Teej","Fjord","Farthead","Tony","Christian","Timmy","Dirk","Doug","Nate","Condel$","Willie","Nuble","Polaris","SOD"];
 
@@ -478,27 +483,50 @@ function RefreshBar({lastUpdated,onRefresh,liveStatus}){
 }
 
 // ---- LEADERBOARD ----
-function Leaderboard({allPicks,bracket}){
+function Leaderboard({allPicks,bracket,myName,goToPicks}){
   const [exp,setExp]=useState(null);
   const names=Object.keys(allPicks);
+  const revealed=picksRevealed();
+  const myEntry=myName&&allPicks[myName];
   const entries=useMemo(()=>names.map(n=>{
     const s=scorePlayer(allPicks[n],bracket);
     return {name:n,...s,champion:allPicks[n].champion,tbGoals:allPicks[n].tbGoals};
   }).sort((a,b)=>b.total-a.total),[allPicks,bracket]);
 
+  const PicksPrompt=()=>(
+    <button className="cta" onClick={goToPicks} style={{border:"none",cursor:"pointer",width:"calc(100% - 32px)"}}>
+      {myEntry?"✎ View / edit your bracket →":"📝 Make your picks →"}
+    </button>
+  );
+
   if(names.length===0)return <div>
-    <Banner title="Standings" sub="Leaderboard appears once picks are in"/>
-    <div className="empty"><div className="big">🏆</div><strong>No picks yet</strong>
-      <p style={{marginTop:8,fontSize:14}}>Head to the Picks tab to fill out your knockout bracket. Once entries are in, everyone gets ranked here by total points.</p></div>
+    <Banner title="Standings" sub="Make your bracket to get on the board"/>
+    <PicksPrompt/>
+    <div className="empty"><div className="big">🏆</div><strong>No brackets in yet</strong>
+      <p style={{marginTop:8,fontSize:14}}>Be the first — head to the Picks tab and fill out your knockout bracket. Everyone gets ranked here by total points.</p></div>
     <ScoringKey/></div>;
+
+  // Before reveal: keep everyone's picks hidden so nobody is influenced.
+  if(!revealed)return <div>
+    <Banner title="Standings" sub={`${names.length} ${names.length===1?"bracket":"brackets"} locked in`}/>
+    <PicksPrompt/>
+    <div className="info" style={{textAlign:"center"}}>
+      <div style={{fontSize:30,marginBottom:6}}>🔒</div>
+      <strong>Picks are hidden until kickoff</strong>
+      <p style={{marginTop:8}}>To keep things fair, everyone's brackets stay secret until the first Round of 32 match kicks off. {names.length} {names.length===1?"person has":"people have"} entered so far.</p>
+      {myEntry&&<p style={{marginTop:10,color:"var(--grn)"}}>✓ Your bracket is locked in. You can still edit it until kickoff.</p>}
+    </div>
+    <ScoringKey/></div>;
+
   return <div>
     <Banner title="Standings" sub={`${names.length} players · live knockout scoring`}/>
+    <PicksPrompt/>
     <div className="panel">{entries.map((e,i)=>{
       const isExp=exp===e.name;const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":null;
       return <div key={e.name}>
         <div className={`lb-row ${i%2?"od":""}`} onClick={()=>setExp(isExp?null:e.name)}>
           <span className="lb-pos">{medal?<span className="medal">{medal}</span>:i+1}</span>
-          <span className="lb-name">{e.name}<span className="exp-a">{isExp?"▲":"▼"}</span></span>
+          <span className="lb-name">{e.name}{e.name===myName?<span style={{color:"var(--grn)",fontSize:11,marginLeft:6}}>(you)</span>:null}<span className="exp-a">{isExp?"▲":"▼"}</span></span>
           {e.champion&&<span className="lb-champ hide-sm"><Flag team={e.champion} size="sm"/>{e.champion}</span>}
           <span className="lb-pts">{e.total}<small>PTS</small></span></div>
         {isExp&&<div className="lb-exp">
@@ -520,12 +548,34 @@ function ScoringKey(){
 }
 
 // ---- BRACKET (everyone's picks per tie) ----
-function BracketView({allPicks,bracket}){
+function BracketView({allPicks,bracket,myName}){
   const [mode,setMode]=useState("list");
   const [round,setRound]=useState("R32");
   const [who,setWho]=useState("everyone"); // "everyone" or a player name
-  const names=Object.keys(allPicks);
+  const revealed=picksRevealed();
+  // Before reveal, the only player whose picks you may see is yourself.
+  const visibleNames=revealed?Object.keys(allPicks):(myName&&allPicks[myName]?[myName]:[]);
+  const names=visibleNames;
   const rd=ROUNDS.find(r=>r.key===round);
+
+  // Before reveal: the "Visual" and actual-bracket structure is fine to show (it's just real results),
+  // but the per-player picks (List "Everyone" + other players) are hidden.
+  if(!revealed && mode==="list" && who==="everyone")
+    return <div>
+      <Banner title="Bracket" sub="Picks hidden until kickoff"/>
+      <div className="pk-tabs" style={{marginBottom:2}}>
+        <button className={`pk-tab on`}>☰ List</button>
+        <button className={`pk-tab`} onClick={()=>setMode("visual")}>🗺 Visual</button>
+      </div>
+      <div className="info" style={{textAlign:"center"}}>
+        <div style={{fontSize:30,marginBottom:6}}>🔒</div>
+        <strong>Everyone's picks are hidden until kickoff</strong>
+        <p style={{marginTop:8}}>To keep it fair, you can't see who others picked until the first Round of 32 match starts.{myName&&allPicks[myName]?" You can review your own bracket below.":" Make your bracket in the Picks tab."}</p>
+      </div>
+      {myName&&allPicks[myName]&&<><div className="sectionhead">Your bracket</div><PlayerBracket pick={allPicks[myName]} bracket={bracket}/></>}
+      <div className="pk-tabs" style={{marginTop:10}}><button className="pk-tab" onClick={()=>setMode("visual")}>See the live tournament bracket →</button></div>
+    </div>;
+
   return <div>
     <Banner title="Bracket" sub={mode==="visual"?"The actual bracket — both sides to the final":who==="everyone"?"See who everyone picked in each tie":`${who}'s predicted bracket`}/>
     <div className="pk-tabs" style={{marginBottom:2}}>
@@ -533,11 +583,12 @@ function BracketView({allPicks,bracket}){
       <button className={`pk-tab ${mode==="visual"?"on":""}`} onClick={()=>setMode("visual")}>🗺 Visual</button>
     </div>
     {mode==="visual"?<VisualBracket bracket={bracket}/>:<>
+    {!revealed&&<div className="info" style={{marginBottom:2}}>🔒 Others' picks are hidden until kickoff — you can only see your own bracket for now.</div>}
     {names.length>0&&<div className="pk-tabs" style={{marginTop:2}}>
-      <button className={`pk-tab ${who==="everyone"?"on":""}`} onClick={()=>setWho("everyone")}>Everyone</button>
-      {names.map(n=><button key={n} className={`pk-tab ${who===n?"on":""}`} onClick={()=>setWho(n)}>{n}</button>)}
+      {revealed&&<button className={`pk-tab ${who==="everyone"?"on":""}`} onClick={()=>setWho("everyone")}>Everyone</button>}
+      {names.map(n=><button key={n} className={`pk-tab ${who===n?"on":""}`} onClick={()=>setWho(n)}>{n===myName?`${n} (you)`:n}</button>)}
     </div>}
-    {who==="everyone"?<>
+    {who==="everyone"&&revealed?<>
       <div className="pk-tabs">{ROUNDS.map(r=><button key={r.key} className={`pk-tab ${round===r.key?"on":""}`} onClick={()=>setRound(r.key)}>{r.key}</button>)}</div>
       {rd.ties.map(t=>{
         const [a,b]=bracket.teamsByTie[t.id]||[null,null];
@@ -560,7 +611,7 @@ function BracketView({allPicks,bracket}){
           </div>}
         </div>;
       })}
-    </>:<PlayerBracket pick={allPicks[who]} bracket={bracket}/>}
+    </>:<PlayerBracket pick={allPicks[who==="everyone"?(myName||names[0]):who]} bracket={bracket}/>}
     </>}
   </div>;
 }
@@ -773,7 +824,7 @@ function prunePicks(picks){
   return out;
 }
 
-function PicksView({allPicks,onSubmitted}){
+function PicksView({allPicks,onSubmitted,onName}){
   const [name,setName]=useState("");
   const [picks,setPicks]=useState({});       // {tieId: teamName} across ALL rounds
   const [champion,setChampion]=useState("");
@@ -843,7 +894,7 @@ function PicksView({allPicks,onSubmitted}){
 
     <div className="pf-field">
       <div className="pf-label">Your name</div>
-      <select className="pf-select" value={name} onChange={e=>setName(e.target.value)}>
+      <select className="pf-select" value={name} onChange={e=>{setName(e.target.value);onName&&onName(e.target.value);}}>
         <option value="">Select your name…</option>
         {PARTICIPANTS.map(n=><option key={n} value={n}>{n}</option>)}
       </select>
@@ -894,8 +945,10 @@ function PicksView({allPicks,onSubmitted}){
       <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Your best guess at total goals across all knockout matches (R32 → Final). Closest wins ties.</div>
     </div>
 
-    <button className="pf-submit" disabled={!canSubmit} onClick={submit}>{status==="saving"?"Saving…":"Submit bracket"}</button>
-    {!canSubmit&&status!=="saving"&&<div className="pf-note">{!name.trim()?"Enter your name":!allRoundsDone?`Complete every round (${totalDone}/${totalTies} picks made)`:"Pick your Final winner"}</div>}
+    <button className="pf-submit" disabled={!canSubmit} onClick={submit}>{status==="saving"?"Saving…":status==="ok"?"✓ Saved — submit again to update":"Submit bracket"}</button>
+    {status==="ok"&&<div className="pf-banner ok" style={{margin:"0 16px 4px"}}>✓ Your bracket is saved! It now shows on the Standings &amp; Bracket tabs. You can change it anytime before kickoff.</div>}
+    {status==="err"&&<div className="pf-banner err" style={{margin:"0 16px 4px"}}>⚠ {errMsg}</div>}
+    {!canSubmit&&status!=="saving"&&status!=="ok"&&<div className="pf-note">{!name.trim()?"Pick your name":!allRoundsDone?`Complete every round (${totalDone}/${totalTies} picks made)`:"Pick your Final winner"}</div>}
   </div>;
 }
 
@@ -907,6 +960,7 @@ function App(){
   const [matches,setMatches]=useState([]);
   const [stats,setStats]=useState(null);
   const [allPicks,setAllPicks]=useState({});
+  const [myName,setMyName]=useState("");   // the player using this device (set in Picks)
   const [flagsReady,setFlagsReady]=useState(0);
   const [lastUpdated,setLastUpdated]=useState(Date.now());
   const [liveStatus,setLiveStatus]=useState("idle");
@@ -938,11 +992,11 @@ function App(){
   return <>
     <div className="hdr"><div className="hdr-title"><span className="ball">⚽</span>K&amp;M Knockout Pool</div><div className="hdr-sub">2026 World Cup · Round of 32 → Final</div></div>
     <div className="tabs">{[["standings","Standings"],["bracket","Bracket"],["scores","Scores"],["stats","Stats"],["picks","Picks"]].map(([k,l])=><button key={k} className={`tab ${view===k?"on":""}`} onClick={()=>setView(k)}>{l}</button>)}</div>
-    {view==="standings"&&<Leaderboard allPicks={allPicks} bracket={bracket}/>}
-    {view==="bracket"&&<BracketView allPicks={allPicks} bracket={bracket}/>}
+    {view==="standings"&&<Leaderboard allPicks={allPicks} bracket={bracket} myName={myName} goToPicks={()=>setView("picks")}/>}
+    {view==="bracket"&&<BracketView allPicks={allPicks} bracket={bracket} myName={myName}/>}
     {view==="scores"&&<ScoresView matches={matches} lastUpdated={lastUpdated} onRefresh={fetchLive} liveStatus={liveStatus}/>}
     {view==="stats"&&<StatsView stats={stats} matches={matches} lastUpdated={lastUpdated} onRefresh={fetchLive} liveStatus={liveStatus}/>}
-    {view==="picks"&&<PicksView allPicks={allPicks} onSubmitted={loadPicks}/>}
+    {view==="picks"&&<PicksView allPicks={allPicks} onSubmitted={loadPicks} onName={setMyName}/>}
     <div className="foot">K&amp;M World Cup Knockout Pool · © Kreag · data via ESPN</div></>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
