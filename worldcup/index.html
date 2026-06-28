@@ -201,6 +201,7 @@ button{font-family:inherit}
 .pf-opt.sel .nm{color:var(--grn)}
 .pf-opt .nm{flex:1}
 .pf-opt .seedtag{font-family:var(--fm);font-size:10px;color:var(--dim);background:var(--bg);padding:2px 6px;border-radius:5px}
+.pf-opt .dogtag{font-family:var(--fm);font-size:10px;font-weight:700;color:var(--gold);background:rgba(255,203,61,.12);border:1px solid var(--gold);padding:2px 6px;border-radius:5px}
 .pf-opt .check{color:var(--grn);font-weight:700}
 .pf-submit{display:block;width:calc(100% - 32px);margin:18px 16px;background:var(--grn);color:#04130d;font-weight:800;padding:15px;border:none;border-radius:14px;font-size:15px;font-family:var(--fx);text-transform:uppercase;letter-spacing:.5px;cursor:pointer}
 .pf-submit:disabled{opacity:.5;cursor:not-allowed}
@@ -269,13 +270,15 @@ const toApp=nm=>NAME_ALIASES_REV[nm]||nm;
 //  BRACKET — Round of 32 (fixed). seed = group-finish rank
 //  (1=winner, 2=runner-up, 3=third) used for underdog bonus.
 // ══════════════════════════════════════════════════════════
-const SEED={ // each team's group-stage finish position
-  "Mexico":1,"South Africa":2,"Switzerland":1,"Canada":2,"Bosnia-Herzegovina":3,
-  "Brazil":1,"Morocco":2,"United States":1,"Türkiye":2,"Paraguay":3,
-  "Germany":1,"Ecuador":2,"Netherlands":1,"Japan":2,"Sweden":3,
-  "Belgium":1,"Egypt":2,"Spain":1,"Uruguay":2,"France":1,"Senegal":2,"Norway":3,
-  "Argentina":1,"Austria":2,"Algeria":3,"Portugal":1,"Colombia":1,"Congo DR":3,
-  "England":1,"Croatia":2,"Ghana":3,"Ivory Coast":2,"Cape Verde":3,"Australia":3
+const SEED={ // FIFA world ranking (June 11 2026) — used for the underdog bonus
+  "Argentina":1,"Spain":2,"France":3,"England":4,"Portugal":5,"Brazil":6,
+  "Netherlands":7,"Belgium":8,"Germany":9,"Croatia":10,
+  "Morocco":12,"Colombia":13,"Mexico":14,"Uruguay":15,
+  "Japan":18,"United States":17,"Switzerland":19,"Senegal":20,
+  "Austria":22,"Ecuador":23,"Australia":24,"Norway":28,
+  "Sweden":29,"Canada":30,"Egypt":32,"Algeria":36,
+  "Paraguay":38,"Ivory Coast":40,"Congo DR":57,"South Africa":58,
+  "Cape Verde":66,"Ghana":71,"Bosnia-Herzegovina":74
 };
 // 16 Round-of-32 ties, in bracket order. id = stable key for picks/scoring.
 const R32=[
@@ -425,6 +428,17 @@ function resolveBracket(matches){
 // ══════════════════════════════════════════════════════════
 //  SCORING ENGINE
 // ══════════════════════════════════════════════════════════
+// Underdog bonus from FIFA ranking gap. The chosen team must be ranked WORSE
+// (higher number) than its opponent. Bonus = ceil(gap/10) points per "tier",
+// times the round multiplier — so beating a much higher-ranked side pays more,
+// and it scales up in later rounds. Capped so a single upset can't dwarf everything.
+function underdogBonus(chosen,opp,roundKey){
+  const rc=SEED[chosen],ro=SEED[opp];
+  if(!rc||!ro||rc<=ro)return 0;            // pick is favorite or equal → no bonus
+  const gap=rc-ro;
+  const tiers=Math.min(Math.ceil(gap/10),5); // every ~10 ranks = 1 tier, max 5
+  return tiers*SCORING.underdogMultiplier[roundKey];
+}
 function scorePlayer(pick,bracket){
   // pick = { picks:{tieId:teamName}, champion }
   let total=0;const perRound={R32:0,R16:0,QF:0,SF:0,F:0};
@@ -434,12 +448,9 @@ function scorePlayer(pick,bracket){
       const winner=bracket.winnerByTie[t.id];
       if(winner&&toApp(chosen)===toApp(winner)){
         let pts=SCORING.knockout[rd.key];
-        // underdog bonus: chosen team seeded lower (higher number) than its opponent in this tie
         const [a,b]=bracket.teamsByTie[t.id]||[];
         const opp=toApp(a)===toApp(chosen)?b:a;
-        if(opp&&SEED[chosen]&&SEED[opp]&&SEED[chosen]>SEED[opp]){
-          pts+=(SEED[chosen]-SEED[opp])*SCORING.underdogMultiplier[rd.key];
-        }
+        if(opp)pts+=underdogBonus(chosen,opp,rd.key);
         total+=pts;perRound[rd.key]+=pts;
       }
     });
@@ -502,7 +513,7 @@ function ScoringKey(){
     <div className="sk-row"><span>Round of 16 / Quarterfinal</span><span className="pts">+8 / +16</span></div>
     <div className="sk-row"><span>Semifinal / Final winner</span><span className="pts">+24 / +32</span></div>
     <div className="sk-row"><span>Correct champion bonus</span><span className="pts">+16</span></div>
-    <p className="sk-note"><strong style={{color:"var(--gold)"}}>Underdog bonus:</strong> correctly pick a lower-seeded team (one that finished lower in its group) and earn extra points equal to the seed gap × the round (×1 in R32 up to ×5 in the Final). Backing a Cinderella run pays off big.</p></div>;
+    <p className="sk-note"><strong style={{color:"var(--gold)"}}>Underdog bonus:</strong> correctly pick a team ranked lower than its opponent in the <strong>FIFA World Ranking</strong> and earn extra points — about +1 for every 10 ranking places of gap (capped at 5 tiers), multiplied by the round (×1 in R32 up to ×5 in the Final). Backing a big upset deep into the bracket pays off most.</p></div>;
 }
 
 // ---- BRACKET (everyone's picks per tie) ----
@@ -583,7 +594,7 @@ function PlayerBracket({pick,bracket}){
     </div>)}
   </div>;
 }
-function seedLabel(team){const s=SEED[team];return s===1?"1st in grp":s===2?"2nd in grp":s===3?"3rd in grp":"";}
+function seedLabel(team){const r=SEED[team];return r?`#${r}`:"";}
 function teamCode(team){return team?(LOGO[team]||team.slice(0,3)).toUpperCase():"TBD";}
 function VisualBracket({bracket}){
   // Linear bracket: R32 → Final. Top half (r32_1..8) → SF1, bottom half (r32_9..16) → SF2.
@@ -847,10 +858,18 @@ function PicksView({allPicks,onSubmitted}){
             <div className="pf-opt" style={{cursor:"default",color:"var(--dim)"}}><span className="nm">Pick the earlier rounds first…</span></div>
           </div>;
           return <div className="pf-match" key={t.id}>
-            <div className="pf-match-h">{a} vs {b}</div>
-            {[a,b].map(team=><button key={team} className={`pf-opt ${picks[t.id]===team?"sel":""}`} onClick={()=>choose(t.id,team)}>
-              <Flag team={team}/><span className="nm">{team}</span><span className="seedtag">{seedLabel(team)}</span>{picks[t.id]===team&&<span className="check">✓</span>}
-            </button>)}
+            <div className="pf-match-h">{a} (#{SEED[a]||"–"}) vs {b} (#{SEED[b]||"–"})</div>
+            {[a,b].map(team=>{
+              const opp=team===a?b:a;
+              const isDog=SEED[team]&&SEED[opp]&&SEED[team]>SEED[opp];
+              const bonus=isDog?underdogBonus(team,opp,rd.key):0;
+              return <button key={team} className={`pf-opt ${picks[t.id]===team?"sel":""}`} onClick={()=>choose(t.id,team)}>
+                <Flag team={team}/><span className="nm">{team}</span>
+                <span className="seedtag">{seedLabel(team)}</span>
+                {bonus>0&&<span className="dogtag">+{bonus} dog</span>}
+                {picks[t.id]===team&&<span className="check">✓</span>}
+              </button>;
+            })}
           </div>;
         })}
       </div>;
