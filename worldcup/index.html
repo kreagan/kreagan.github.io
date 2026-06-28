@@ -206,6 +206,12 @@ button{font-family:inherit}
 .pf-submit{display:block;width:calc(100% - 32px);margin:18px 16px;background:var(--grn);color:#04130d;font-weight:800;padding:15px;border:none;border-radius:14px;font-size:15px;font-family:var(--fx);text-transform:uppercase;letter-spacing:.5px;cursor:pointer}
 .pf-submit:disabled{opacity:.5;cursor:not-allowed}
 .pf-note{margin:0 16px;font-family:var(--fm);font-size:11px;color:var(--dim);text-align:center}
+.picks-prompt{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px;padding:15px 18px;background:linear-gradient(135deg,var(--pitch),var(--panel));border:1px solid var(--grn-d);border-radius:14px;cursor:pointer;text-align:left;transition:border-color .15s,transform .1s}
+.picks-prompt:hover{border-color:var(--grn)}
+.picks-prompt:active{transform:scale(.995)}
+.picks-prompt .pp-ico{font-size:20px}
+.picks-prompt .pp-txt{flex:1;font-family:var(--fx);font-weight:800;font-size:16px;color:var(--tx);text-transform:uppercase;letter-spacing:.3px}
+.picks-prompt .pp-arrow{font-family:var(--fm);font-weight:700;font-size:18px;color:var(--grn)}
 .pf-banner{margin:12px 16px;padding:12px 14px;border-radius:12px;font-family:var(--fm);font-size:13px;text-align:center}
 .pf-banner.ok{background:rgba(60,228,146,.12);color:var(--grn);border:1px solid var(--grn-d)}
 .pf-banner.err{background:rgba(255,93,115,.12);color:var(--red);border:1px solid var(--red)}
@@ -247,9 +253,13 @@ const { useState, useEffect, useMemo, useCallback } = React;
 // ══════════════════════════════════════════════════════════
 const PICKS_API = "https://script.google.com/macros/s/AKfycbyybBxbgIfuDs7eiomADbRD0jHK0r8e2F3zYooopHV7vp8FpDbgNVTEJqE_qBU7bSY2/exec"; // ends in /exec
 const PICKS_LOCKED = false; // set true once knockout picks should be frozen
-// Everyone's picks stay hidden from other players until the first knockout match kicks off,
-// so nobody is influenced by others' brackets. You always see your OWN picks.
-// Set to the first R32 kickoff (ISO, UTC). Adjust if needed.
+// ─── PICK REVEAL DEADLINE ───────────────────────────────────────────────
+// Everyone's picks (names, champions, full brackets) stay HIDDEN from other
+// players until this moment. Each person can always see their OWN bracket.
+// SET THIS to when you want picks to open up — normally the first knockout
+// kickoff. Format is ISO UTC. Example below = June 28 2026, 7:00 PM UTC.
+// To convert your local kickoff to UTC, or to push the deadline later while
+// you still collect entries, just change the string.
 const PICKS_REVEAL_TIME = new Date("2026-06-28T19:00:00Z");
 const picksRevealed = () => Date.now() >= PICKS_REVEAL_TIME.getTime();
 // Fixed participant list (same as the golf pool)
@@ -494,8 +504,10 @@ function Leaderboard({allPicks,bracket,myName,goToPicks}){
   }).sort((a,b)=>b.total-a.total),[allPicks,bracket]);
 
   const PicksPrompt=()=>(
-    <button className="cta" onClick={goToPicks} style={{border:"none",cursor:"pointer",width:"calc(100% - 32px)"}}>
-      {myEntry?"✎ View / edit your bracket →":"📝 Make your picks →"}
+    <button className="picks-prompt" onClick={goToPicks}>
+      <span className="pp-ico">{myEntry?"✎":"📝"}</span>
+      <span className="pp-txt">{myEntry?"View or edit your bracket":"Make your picks"}</span>
+      <span className="pp-arrow">→</span>
     </button>
   );
 
