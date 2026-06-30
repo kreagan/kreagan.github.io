@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -64,10 +65,15 @@ button{font-family:inherit}
 .lb-pos{width:36px;font-family:var(--fm);font-weight:700;font-size:15px;color:var(--dim);text-align:center}
 .lb-pos .medal{font-size:19px}
 .lb-name{flex:1;font-weight:700;font-size:16px;padding-left:8px}
+.lb-name-wrap{flex:1;display:flex;flex-direction:column;gap:5px;padding-left:8px}
+.lb-name-wrap .lb-name{padding-left:0}
+.lb-bar{height:5px;border-radius:3px;background:var(--bd);overflow:hidden}
+.lb-bar-fill{height:100%;background:linear-gradient(90deg,var(--grn-d),var(--grn));border-radius:3px;transition:width .4s ease}
+.elim-tag{font-family:var(--fm);font-size:9px;font-weight:700;color:var(--red);background:rgba(255,93,115,.14);border:1px solid var(--red);padding:1px 5px;border-radius:4px;margin-left:7px;letter-spacing:.5px;vertical-align:middle}
 .lb-name .exp-a{color:var(--dim);font-size:10px;margin-left:7px}
 .lb-champ{display:flex;align-items:center;gap:6px;font-family:var(--fm);font-size:12px;color:var(--dim);margin-right:14px}
 .lb-pts{font-family:var(--fm);font-weight:700;font-size:18px;color:var(--grn);text-align:right;min-width:52px}
-.lb-pts small{display:block;font-size:9px;color:var(--dim);font-weight:400;letter-spacing:.5px}
+.lb-pts small{display:block;font-size:9px;color:var(--dim);font-weight:400;letter-spacing:.3px;white-space:nowrap}
 .lb-exp{background:var(--panel2);border-bottom:1px solid var(--bd);padding:14px 18px;animation:slide .2s ease}
 @keyframes slide{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .lb-exp-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -255,7 +261,7 @@ const { useState, useEffect, useMemo, useCallback } = React;
 //  CONFIG — set this after deploying the Apps Script backend
 // ══════════════════════════════════════════════════════════
 const PICKS_API = "https://script.google.com/macros/s/AKfycbyybBxbgIfuDs7eiomADbRD0jHK0r8e2F3zYooopHV7vp8FpDbgNVTEJqE_qBU7bSY2/exec"; // ends in /exec
-const PICKS_LOCKED = false; // set true once knockout picks should be frozen
+const PICKS_LOCKED = true; // set true once knockout picks should be frozen
 // ─── PICK REVEAL DEADLINE ───────────────────────────────────────────────
 // Everyone's picks (names, champions, full brackets) stay HIDDEN from other
 // players until this moment. Each person can always see their OWN bracket.
@@ -442,7 +448,14 @@ function resolveBracket(matches){
   resolveRound(QF);QF.forEach(t=>{const[a,b]=teamsByTie[t.id];const r=findTieResult(t,a,b,matches);if(r&&r.winner)winnerByTie[t.id]=r.winner;});
   resolveRound(SF);SF.forEach(t=>{const[a,b]=teamsByTie[t.id];const r=findTieResult(t,a,b,matches);if(r&&r.winner)winnerByTie[t.id]=r.winner;});
   resolveRound(FINAL);FINAL.forEach(t=>{const[a,b]=teamsByTie[t.id];const r=findTieResult(t,a,b,matches);if(r&&r.winner)winnerByTie[t.id]=r.winner;});
-  return {teamsByTie,winnerByTie};
+  // Eliminated = a team that was in a decided tie but didn't win it.
+  const eliminated=new Set();
+  [...R32,...R16,...QF,...SF,...FINAL].forEach(t=>{
+    const w=winnerByTie[t.id];if(!w)return;
+    const [a,b]=teamsByTie[t.id]||[];
+    [a,b].forEach(team=>{if(team&&toApp(team)!==toApp(w))eliminated.add(toApp(team));});
+  });
+  return {teamsByTie,winnerByTie,eliminated};
 }
 
 // ══════════════════════════════════════════════════════════
@@ -480,6 +493,52 @@ function scorePlayer(pick,bracket){
   if(pick.champion&&champWinner&&toApp(pick.champion)===toApp(champWinner)){total+=SCORING.champion;perRound.F+=SCORING.champion;}
   return {total,perRound};
 }
+// Maximum points a player can still finish with: points already earned, PLUS the
+// best-case points from every tie not yet decided where their pick is still alive.
+function maxPossible(pick,bracket){
+  const elim=bracket.eliminated||new Set();
+  let max=0;
+  ROUNDS.forEach(rd=>{
+    rd.ties.forEach(t=>{
+      const chosen=pick.picks?.[t.id];if(!chosen)return;
+      const winner=bracket.winnerByTie[t.id];
+      if(winner){
+        // tie decided: only counts if they got it right
+        if(toApp(chosen)===toApp(winner)){
+          let pts=SCORING.knockout[rd.key];
+          const [a,b]=bracket.teamsByTie[t.id]||[];
+          const opp=toApp(a)===toApp(chosen)?b:a;
+          if(opp)pts+=underdogBonus(chosen,opp,rd.key);
+          max+=pts;
+        }
+      } else {
+        // tie undecided: still possible IF their team isn't already eliminated
+        if(!elim.has(toApp(chosen))){
+          let pts=SCORING.knockout[rd.key];
+          // best-case underdog bonus: assume the toughest (best-ranked) possible opponent
+          const [a,b]=bracket.teamsByTie[t.id]||[];
+          const known=[a,b].filter(Boolean).map(toApp).find(x=>x!==toApp(chosen));
+          if(known)pts+=underdogBonus(chosen,known,rd.key);
+          else pts+=bestCaseUnderdog(chosen,rd.key); // opponent unknown → assume best possible gap
+          max+=pts;
+        }
+      }
+    });
+  });
+  // champion: possible if their champion pick isn't eliminated
+  const champWinner=bracket.winnerByTie["final"];
+  if(pick.champion){
+    if(champWinner){if(toApp(pick.champion)===toApp(champWinner))max+=SCORING.champion;}
+    else if(!elim.has(toApp(pick.champion)))max+=SCORING.champion;
+  }
+  return max;
+}
+// Best-case underdog bonus when the opponent isn't known yet: assume max 5 tiers.
+function bestCaseUnderdog(chosen,roundKey){
+  const rc=SEED[chosen];if(!rc)return 0;
+  // if our team is already top-ranked it can't be an underdog; otherwise cap at 5 tiers
+  return rc>1?5*SCORING.underdogMultiplier[roundKey]:0;
+}
 
 // ══════════════════════════════════════════════════════════
 //  COMPONENTS
@@ -503,8 +562,9 @@ function Leaderboard({allPicks,bracket,myName,goToPicks}){
   const myEntry=myName&&allPicks[myName];
   const entries=useMemo(()=>names.map(n=>{
     const s=scorePlayer(allPicks[n],bracket);
-    return {name:n,...s,champion:allPicks[n].champion,tbGoals:allPicks[n].tbGoals};
-  }).sort((a,b)=>b.total-a.total),[allPicks,bracket]);
+    const max=maxPossible(allPicks[n],bracket);
+    return {name:n,...s,max,champion:allPicks[n].champion,tbGoals:allPicks[n].tbGoals};
+  }).sort((a,b)=>b.total-a.total||b.max-a.max),[allPicks,bracket]);
 
   const PicksPrompt=()=>(
     PICKS_LOCKED?null:<button className="picks-prompt" onClick={goToPicks}>
@@ -533,24 +593,33 @@ function Leaderboard({allPicks,bracket,myName,goToPicks}){
     </div>
     <ScoringKey/></div>;
 
+  const leaderTotal=entries.length?entries[0].total:0;
   return <div>
-    <Banner title="Standings" sub={`${names.length} players · live knockout scoring`}/>
+    <Banner title="Standings" sub={`${names.length} players · points now vs. max possible`}/>
     <PicksPrompt/>
     <div className="panel">{entries.map((e,i)=>{
       const isExp=exp===e.name;const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":null;
+      // mathematically out if their best-case can't reach the current leader (and they're not the leader)
+      const out=e.max<leaderTotal&&i!==0;
+      const pct=e.max>0?Math.round(e.total/e.max*100):0;
       return <div key={e.name}>
-        <div className={`lb-row ${i%2?"od":""}`} onClick={()=>setExp(isExp?null:e.name)}>
+        <div className={`lb-row ${i%2?"od":""}`} onClick={()=>setExp(isExp?null:e.name)} style={out?{opacity:.55}:{}}>
           <span className="lb-pos">{medal?<span className="medal">{medal}</span>:i+1}</span>
-          <span className="lb-name">{e.name}{e.name===myName?<span style={{color:"var(--grn)",fontSize:11,marginLeft:6}}>(you)</span>:null}<span className="exp-a">{isExp?"▲":"▼"}</span></span>
-          {e.champion&&<span className="lb-champ hide-sm"><Flag team={e.champion} size="sm"/>{e.champion}</span>}
-          <span className="lb-pts">{e.total}<small>PTS</small></span></div>
+          <div className="lb-name-wrap">
+            <span className="lb-name">{e.name}{e.name===myName?<span style={{color:"var(--grn)",fontSize:11,marginLeft:6}}>(you)</span>:null}{out&&<span className="elim-tag">OUT</span>}<span className="exp-a">{isExp?"▲":"▼"}</span></span>
+            <div className="lb-bar"><div className="lb-bar-fill" style={{width:pct+"%"}}></div></div>
+          </div>
+          <span className="lb-pts">{e.total}<small>/ {e.max} MAX</small></span></div>
         {isExp&&<div className="lb-exp">
+          <div className="lb-exp-row"><span className="l">Points now</span><span className="v u">{e.total}</span></div>
+          <div className="lb-exp-row"><span className="l">Max still possible</span><span className="v">{e.max}</span></div>
           <div className="lb-exp-row"><span className="l">Champion pick</span><span className="v" style={{display:"flex",gap:6,alignItems:"center"}}>{e.champion?<><Flag team={e.champion} size="sm"/>{e.champion}</>:"—"}</span></div>
           <div className="lb-exp-row"><span className="l">Tiebreaker — knockout goals</span><span className="v">{e.tbGoals!=null&&e.tbGoals!==""?e.tbGoals:"—"}</span></div>
           <div className="rnd-grid">
             {ROUNDS.map(rd=>{const v=e.perRound[rd.key];return <div key={rd.key} className={`rnd-cell ${v>0?"pos":"zero"}`}><span className="rc-l">{rd.key}</span><span className="rc-v">{v}</span></div>;})}
           </div></div>}
       </div>;})}</div>
+    <div className="info" style={{fontSize:13}}>Each player's score shows <strong>points earned</strong> out of their <strong>max still possible</strong> (the green bar). Max drops as a player's picked teams get knocked out; once someone's max falls below the current leader's score they're marked <strong>OUT</strong>.</div>
     <ScoringKey/></div>;
 }
 function ScoringKey(){
