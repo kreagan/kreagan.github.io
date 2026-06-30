@@ -135,6 +135,20 @@ button{font-family:inherit}
 .vb-team.win{background:rgba(60,228,146,.12)}
 .vb-team.win .c{color:var(--grn)}
 .vb-team.out{opacity:.45}
+.vb-team.pb-correct{background:rgba(60,228,146,.22)}
+.vb-team.pb-correct .c{color:var(--grn)}
+.vb-team.pb-wrong{background:rgba(255,93,115,.18)}
+.vb-team.pb-wrong .c{color:var(--red);text-decoration:line-through}
+.vb-team.pb-pending{background:rgba(255,255,255,.04)}
+.vb-team.pb-dim{opacity:.4}
+.vb-team .pb-mark{margin-left:auto;font-family:var(--fm);font-weight:700;font-size:11px}
+.vb-team.pb-correct .pb-mark{color:var(--grn)}
+.vb-team.pb-wrong .pb-mark{color:var(--red)}
+.dot-key{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.vb-champ.champ-ok{border-color:var(--grn)}
+.vb-champ.champ-ok .vb-champ-l{color:var(--grn)}
+.vb-champ.champ-no{border-color:var(--red)}
+.vb-champ.champ-no .vb-champ-l{color:var(--red)}
 .vb-champ{display:flex;align-items:center;justify-content:space-between;margin:4px 16px 0;padding:14px 18px;background:linear-gradient(135deg,var(--pitch),var(--panel));border:1px solid var(--gold);border-radius:14px}
 .vb-champ-l{font-family:var(--fm);font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:.5px}
 .vb-champ-v{display:flex;align-items:center;gap:8px;font-family:var(--fx);font-weight:800;font-size:18px}
@@ -661,17 +675,23 @@ function BracketView({allPicks,bracket,myName}){
     </div>;
 
   return <div>
-    <Banner title="Bracket" sub={mode==="visual"?"The actual bracket — both sides to the final":who==="everyone"?"See who everyone picked in each tie":`${who}'s predicted bracket`}/>
+    <Banner title="Bracket" sub={mode==="visual"?(who==="everyone"?"The actual bracket — both sides to the final":`${who}'s bracket — green right, red busted`):who==="everyone"?"See who everyone picked in each tie":`${who}'s predicted bracket`}/>
     <div className="pk-tabs" style={{marginBottom:2}}>
       <button className={`pk-tab ${mode==="list"?"on":""}`} onClick={()=>setMode("list")}>☰ List</button>
       <button className={`pk-tab ${mode==="visual"?"on":""}`} onClick={()=>setMode("visual")}>🗺 Visual</button>
     </div>
-    {mode==="visual"?<VisualBracket bracket={bracket}/>:<>
-    {!revealed&&<div className="info" style={{marginBottom:2}}>🔒 Others' picks are hidden until kickoff — you can only see your own bracket for now.</div>}
-    {names.length>0&&<div className="pk-tabs" style={{marginTop:2}}>
-      {revealed&&<button className={`pk-tab ${who==="everyone"?"on":""}`} onClick={()=>setWho("everyone")}>Everyone</button>}
+    {/* player selector (shared by both modes when revealed/own) */}
+    {(names.length>0||revealed)&&<div className="pk-tabs" style={{marginTop:2}}>
+      <button className={`pk-tab ${who==="everyone"?"on":""}`} onClick={()=>setWho("everyone")}>{mode==="visual"?"🏆 Actual":"Everyone"}</button>
       {names.map(n=><button key={n} className={`pk-tab ${who===n?"on":""}`} onClick={()=>setWho(n)}>{n===myName?`${n} (you)`:n}</button>)}
     </div>}
+    {!revealed&&<div className="info" style={{marginBottom:2}}>🔒 Others' picks are hidden until kickoff — you can only see your own bracket for now.</div>}
+
+    {mode==="visual"?(
+      who==="everyone"||!allPicks[who]
+        ? <VisualBracket bracket={bracket}/>
+        : <VisualPlayerBracket pick={allPicks[who]} bracket={bracket} who={who}/>
+    ):<>
     {who==="everyone"&&revealed?<>
       <div className="pk-tabs">{ROUNDS.map(r=><button key={r.key} className={`pk-tab ${round===r.key?"on":""}`} onClick={()=>setRound(r.key)}>{r.key}</button>)}</div>
       {rd.ties.map(t=>{
@@ -699,6 +719,58 @@ function BracketView({allPicks,bracket,myName}){
     </>}
   </div>;
 }
+// Status of a player's pick for a tie: correct / wrong (busted) / pending.
+function pickStatus(team,tieId,bracket){
+  if(!team)return "pending";
+  const w=bracket.winnerByTie[tieId];
+  if(w)return toApp(team)===toApp(w)?"correct":"wrong";
+  if((bracket.eliminated||new Set()).has(toApp(team)))return "wrong";
+  return "pending";
+}
+// A player's full predicted bracket, visual + color-coded by correctness.
+function VisualPlayerBracket({pick,bracket,who}){
+  const myTeams=resolvePlayerBracket(pick.picks||{});
+  const H=16*52;
+  const champ=pick.champion;
+  const champStatus=champ?pickStatus(champ,"final",bracket):"pending";
+  return <div>
+    <div className="info" style={{marginTop:8,marginBottom:6,display:"flex",gap:14,flexWrap:"wrap",alignItems:"center"}}>
+      <span><span className="dot-key" style={{background:"var(--grn)"}}></span>Correct</span>
+      <span><span className="dot-key" style={{background:"var(--red)"}}></span>Busted / out</span>
+      <span><span className="dot-key" style={{background:"var(--dim)"}}></span>Still alive</span>
+      <span style={{marginLeft:"auto",color:"var(--dim)",fontFamily:"var(--fm)",fontSize:12}}>scroll sideways →</span>
+    </div>
+    <div className="vb-wrap"><div className="vb" style={{height:H+"px"}}>
+      {ROUNDS.map(rd=>(
+        <div className="vb-round" key={rd.key}>
+          <div className="vb-rh">{rd.key}</div>
+          <div className="vb-body">
+            {rd.ties.map(t=>{
+              const advancing=pick.picks?.[t.id];        // the team this player advanced from this tie
+              const [a,b]=myTeams[t.id]||[null,null];     // the two teams they had meeting here
+              return <div className="vb-match" key={t.id}>
+                {[a,b].map((team,idx)=>{
+                  const isPick=team&&advancing&&toApp(team)===toApp(advancing);
+                  const st=isPick?pickStatus(team,t.id,bracket):(team&&(bracket.eliminated||new Set()).has(toApp(team))?"gone":"");
+                  const cls=isPick?(st==="correct"?"pb-correct":st==="wrong"?"pb-wrong":"pb-pending"):(st==="gone"?"pb-dim":"");
+                  return <div key={idx} className={`vb-team ${cls}`}>
+                    <Flag team={team} size="sm"/><span className="c">{teamCode(team)}</span>
+                    {isPick&&st==="correct"&&<span className="pb-mark">✓</span>}
+                    {isPick&&st==="wrong"&&<span className="pb-mark">✗</span>}
+                  </div>;
+                })}
+              </div>;
+            })}
+          </div>
+        </div>
+      ))}
+    </div></div>
+    <div className={`vb-champ ${champStatus==="correct"?"champ-ok":champStatus==="wrong"?"champ-no":""}`}>
+      <span className="vb-champ-l">🏆 {who}'s champion</span>
+      <span className="vb-champ-v">{champ?<><Flag team={champ} size="sm"/>{champ}{champStatus==="correct"?" ✓":champStatus==="wrong"?" ✗":""}</>:"—"}</span>
+    </div>
+  </div>;
+}
 // One player's full predicted path, round by round, with correct/wrong marks once results land.
 function PlayerBracket({pick,bracket}){
   if(!pick)return <div className="info">No bracket found for this player.</div>;
@@ -711,20 +783,22 @@ function PlayerBracket({pick,bracket}){
         const [a,b]=myTeams[t.id]||[null,null];
         const myPick=pick.picks?.[t.id];
         const actualWinner=bracket.winnerByTie[t.id];
-        // status of this pick: correct (matches actual winner), wrong (actual winner differs), pending
-        let status="pending";
-        if(myPick&&actualWinner){status=toApp(myPick)===toApp(actualWinner)?"correct":"wrong";}
+        // status via shared helper: correct / wrong (lost OR team eliminated earlier) / pending
+        const status=myPick?pickStatus(myPick,t.id,bracket):"pending";
+        // is the pick dead because the team is already out (vs. losing this exact tie)?
+        const bustedEarly=status==="wrong"&&!actualWinner;
         return <div className="tie" key={t.id}>
           <div className="tie-h"><span>{rd.label}{a&&b?`: ${a} v ${b}`:""}</span>
             {status==="correct"&&<span className="tie-status ft" style={{color:"var(--grn)"}}>✓ correct</span>}
-            {status==="wrong"&&<span className="tie-status ft" style={{color:"var(--red)"}}>✗ {actualWinner} won</span>}
-            {status==="pending"&&myPick&&<span style={{color:"var(--dim)"}}>picked</span>}
+            {status==="wrong"&&actualWinner&&<span className="tie-status ft" style={{color:"var(--red)"}}>✗ {actualWinner} won</span>}
+            {bustedEarly&&<span className="tie-status ft" style={{color:"var(--red)"}}>✗ eliminated</span>}
+            {status==="pending"&&myPick&&<span style={{color:"var(--dim)"}}>still alive</span>}
           </div>
           {myPick
             ? <div className={`tie-side ${status==="correct"?"win":status==="wrong"?"out":""}`}>
-                <Flag team={myPick}/><span className="nm">{myPick}</span>
+                <Flag team={myPick}/><span className="nm" style={status==="wrong"?{textDecoration:"line-through"}:{}}>{myPick}</span>
                 {SEED[myPick]&&<span className="seedtag">{seedLabel(myPick)}</span>}
-                <span style={{fontFamily:"var(--fm)",fontSize:11,color:"var(--dim)"}}>→ advances</span>
+                <span style={{fontFamily:"var(--fm)",fontSize:11,color:status==="wrong"?"var(--red)":"var(--dim)"}}>{status==="wrong"?"dead":"→ advances"}</span>
               </div>
             : <div className="tie-side" style={{color:"var(--dim)"}}><span className="nm">{a&&b?"No pick":"awaiting earlier rounds"}</span></div>}
         </div>;
