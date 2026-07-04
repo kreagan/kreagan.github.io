@@ -1193,11 +1193,13 @@ function PicksView({allPicks,onSubmitted,onName,bracket}){
         </div>
       : <div className="info">Your champion is set automatically once you pick the Final winner above.</div>}
 
-    <div className="pf-field">
-      <div className="pf-label">⚽ Tiebreaker — total goals scored in the knockout stage</div>
-      <input className="pf-input" type="number" value={tbGoals} onChange={e=>setTbGoals(e.target.value)} placeholder="e.g. 140" />
-      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Total goals across all knockout matches (R32 → Final). Closest wins ties.</div>
-    </div>
+    {repick
+      ? <div className="info" style={{marginTop:12}}>⚽ <strong>Tiebreaker kept from your original entry:</strong> {tbGoals!==""&&tbGoals!=null?`${tbGoals} knockout goals`:"—"}. No need to re-enter it.</div>
+      : <div className="pf-field">
+          <div className="pf-label">⚽ Tiebreaker — total goals scored in the knockout stage</div>
+          <input className="pf-input" type="number" value={tbGoals} onChange={e=>setTbGoals(e.target.value)} placeholder="e.g. 140" />
+          <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Total goals across all knockout matches (R32 → Final). Closest wins ties.</div>
+        </div>}
 
     <button className="pf-submit" disabled={!canSubmit} onClick={submit}>{status==="saving"?"Saving…":status==="ok"?"✓ Saved — submit again to update":repick?"Submit R16 → Final picks":"Submit bracket"}</button>
     {status==="ok"&&<div className="pf-banner ok" style={{margin:"0 16px 4px"}}>✓ Saved! Your R32 picks stayed frozen; R16 onward updated. Shows on Standings &amp; Bracket.</div>}
