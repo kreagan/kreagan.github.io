@@ -293,6 +293,8 @@ const PICKS_REVEAL_TIME = new Date("2026-06-28T19:00:00Z");
 const picksRevealed = () => Date.now() >= PICKS_REVEAL_TIME.getTime();
 // Fixed participant list (same as the golf pool)
 const PARTICIPANTS = ["Kreag","Teej","Fjord","Farthead","Tony","Christian","Timmy","Dirk","Doug","Nate","Condel$","Willie","Nuble","Polaris","SOD"];
+// Only the players who submitted an R32 bracket may re-pick R16 onward.
+const REPICK_PARTICIPANTS = ["Kreag","Timmy","Polaris","Christian","Teej","Tony"];
 
 const LOGO={"Mexico":"mex","South Africa":"rsa","South Korea":"kor","Czechia":"cze","Canada":"can","Switzerland":"sui","Qatar":"qat","Bosnia-Herzegovina":"bih","Brazil":"bra","Morocco":"mar","Scotland":"sco","Haiti":"hai","United States":"usa","Paraguay":"par","Australia":"aus","Türkiye":"tur","Germany":"ger","Ecuador":"ecu","Ivory Coast":"civ","Curaçao":"cuw","Netherlands":"ned","Japan":"jpn","Sweden":"swe","Tunisia":"tun","Belgium":"bel","Egypt":"egy","Iran":"irn","New Zealand":"nzl","Spain":"esp","Uruguay":"uru","Saudi Arabia":"ksa","Cape Verde":"cpv","France":"fra","Senegal":"sen","Norway":"nor","Iraq":"irq","Argentina":"arg","Austria":"aut","Algeria":"alg","Jordan":"jor","Portugal":"por","Colombia":"col","Congo DR":"cod","Uzbekistan":"uzb","England":"eng","Croatia":"cro","Ghana":"gha","Panama":"pan"};
 const EMOJI={"Mexico":"🇲🇽","South Africa":"🇿🇦","South Korea":"🇰🇷","Czechia":"🇨🇿","Canada":"🇨🇦","Switzerland":"🇨🇭","Qatar":"🇶🇦","Bosnia-Herzegovina":"🇧🇦","Brazil":"🇧🇷","Morocco":"🇲🇦","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Haiti":"🇭🇹","United States":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Türkiye":"🇹🇷","Germany":"🇩🇪","Ecuador":"🇪🇨","Ivory Coast":"🇨🇮","Curaçao":"🇨🇼","Netherlands":"🇳🇱","Japan":"🇯🇵","Sweden":"🇸🇪","Tunisia":"🇹🇳","Belgium":"🇧🇪","Egypt":"🇪🇬","Iran":"🇮🇷","New Zealand":"🇳🇿","Spain":"🇪🇸","Uruguay":"🇺🇾","Saudi Arabia":"🇸🇦","Cape Verde":"🇨🇻","France":"🇫🇷","Senegal":"🇸🇳","Norway":"🇳🇴","Iraq":"🇮🇶","Argentina":"🇦🇷","Austria":"🇦🇹","Algeria":"🇩🇿","Jordan":"🇯🇴","Portugal":"🇵🇹","Colombia":"🇨🇴","Congo DR":"🇨🇩","Uzbekistan":"🇺🇿","England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦"};
@@ -1069,7 +1071,19 @@ function PicksView({allPicks,onSubmitted,onName,bracket}){
 
   useEffect(()=>{
     const existing=allPicks[name.trim()];
-    if(existing){setPicks(existing.picks||{});setChampion(existing.champion||"");setTbGoals(existing.tbGoals!=null?existing.tbGoals:"");}
+    if(existing){
+      if(repick){
+        // Keep ONLY the frozen R32 picks; discard the old R16+ picks entirely, since
+        // they were made against the wrong bracket. Player re-picks R16 onward fresh.
+        const r32only={};
+        R32.forEach(t=>{if(existing.picks&&existing.picks[t.id])r32only[t.id]=existing.picks[t.id];});
+        setPicks(r32only);
+        setChampion("");                                   // champion re-derived from new Final pick
+        setTbGoals(existing.tbGoals!=null?existing.tbGoals:"");
+      } else {
+        setPicks(existing.picks||{});setChampion(existing.champion||"");setTbGoals(existing.tbGoals!=null?existing.tbGoals:"");
+      }
+    }
   // eslint-disable-next-line
   },[name]);
 
@@ -1096,11 +1110,19 @@ function PicksView({allPicks,onSubmitted,onName,bracket}){
   const submit=async()=>{
     setStatus("saving");setErrMsg("");
     const champ=finalWinner||champion||"";
-    // Preserve the player's frozen R32 picks exactly; only R16+ change in re-pick mode.
+    // Build a CLEAN bracket: original frozen R32 + the player's current R16+ picks.
+    // Never spread old stale picks (they were against the wrong bracket).
     const existing=allPicks[name.trim()]||{};
-    const merged=repick?{...existing.picks,...picks}:picks;
-    // ensure R32 picks are the ORIGINAL ones, never overwritten
-    if(repick&&existing.picks)R32.forEach(t=>{if(existing.picks[t.id])merged[t.id]=existing.picks[t.id];});
+    let merged;
+    if(repick){
+      merged={};
+      // frozen R32 straight from the original submission
+      if(existing.picks)R32.forEach(t=>{if(existing.picks[t.id])merged[t.id]=existing.picks[t.id];});
+      // current R16 -> Final picks only
+      [R16,QF,SF,FINAL].forEach(rd=>rd.forEach(t=>{if(picks[t.id])merged[t.id]=picks[t.id];}));
+    } else {
+      merged=picks;
+    }
     try{
       const res=await fetch(PICKS_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({name:name.trim(),picks:merged,champion:champ,tbGoals})});
       const j=await res.json().catch(()=>({ok:false,error:"Bad response"}));
@@ -1125,7 +1147,7 @@ function PicksView({allPicks,onSubmitted,onName,bracket}){
       <div className="pf-label">Your name</div>
       <select className="pf-select" value={name} onChange={e=>{setName(e.target.value);onName&&onName(e.target.value);}}>
         <option value="">Select your name…</option>
-        {PARTICIPANTS.map(n=><option key={n} value={n}>{n}</option>)}
+        {(repick?REPICK_PARTICIPANTS:PARTICIPANTS).map(n=><option key={n} value={n}>{n}</option>)}
       </select>
       <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>{repick?`Pick your name to re-do R16 onward. Progress: ${totalDone}/${totalTies}`:`Progress: ${totalDone}/${totalTies} picks.`}</div>
     </div>
