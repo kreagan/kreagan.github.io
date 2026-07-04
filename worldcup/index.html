@@ -500,11 +500,12 @@ function resolveBracket(matches){
 // times the round multiplier — so beating a much higher-ranked side pays more,
 // and it scales up in later rounds. Capped so a single upset can't dwarf everything.
 function underdogBonus(chosen,opp,roundKey){
+  // Tiered by FIFA-ranking gap: +1 per ~10 ranking places you overcome, min +1 for any
+  // upset. Close matchups (a few places apart) are worth +1; big upsets scale up gently.
+  // Flat across rounds so it stays consistent with the Round of 32.
   const rc=SEED[chosen],ro=SEED[opp];
-  if(!rc||!ro||rc<=ro)return 0;            // pick is favorite or equal → no bonus
-  const gap=rc-ro;
-  const tiers=Math.min(Math.ceil(gap/10),5); // every ~10 ranks = 1 tier, max 5
-  return tiers*SCORING.underdogMultiplier[roundKey];
+  if(!rc||!ro||rc<=ro)return 0;   // picked the favorite or an even matchup → no bonus
+  return Math.ceil((rc-ro)/10);   // gap 1 → +1, gap 22 → +3, gap 35 → +4
 }
 function scorePlayer(pick,bracket){
   // pick = { picks:{tieId:teamName}, champion }
@@ -569,9 +570,9 @@ function maxPossible(pick,bracket){
 }
 // Best-case underdog bonus when the opponent isn't known yet: assume max 5 tiers.
 function bestCaseUnderdog(chosen,roundKey){
+  // Best possible upset bonus for this team = beating the #1-ranked side.
   const rc=SEED[chosen];if(!rc)return 0;
-  // if our team is already top-ranked it can't be an underdog; otherwise cap at 5 tiers
-  return rc>1?5*SCORING.underdogMultiplier[roundKey]:0;
+  return rc>1?Math.ceil((rc-1)/10):0;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -662,7 +663,7 @@ function ScoringKey(){
     <div className="sk-row"><span>Round of 16 / Quarterfinal</span><span className="pts">+8 / +16</span></div>
     <div className="sk-row"><span>Semifinal / Final winner</span><span className="pts">+24 / +32</span></div>
     <div className="sk-row"><span>Correct champion bonus</span><span className="pts">+16</span></div>
-    <p className="sk-note"><strong style={{color:"var(--gold)"}}>Underdog bonus:</strong> correctly pick a team ranked lower than its opponent in the <strong>FIFA World Ranking</strong> and earn extra points — about +1 for every 10 ranking places of gap (capped at 5 tiers), multiplied by the round (×1 in R32 up to ×5 in the Final). Backing a big upset deep into the bracket pays off most.</p></div>;
+    <p className="sk-note"><strong style={{color:"var(--gold)"}}>Upset bonus:</strong> correctly pick a lower-ranked team (by FIFA World Ranking) and earn a bonus of about <strong>+1 for every 10 ranking places</strong> you overcome. A close upset is +1; a big one like Paraguay (#38) over France (#3) is +4. Pick the favorite and there's no bonus.</p></div>;
 }
 
 // ---- BRACKET (everyone's picks per tie) ----
