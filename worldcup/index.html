@@ -275,7 +275,13 @@ const { useState, useEffect, useMemo, useCallback } = React;
 //  CONFIG — set this after deploying the Apps Script backend
 // ══════════════════════════════════════════════════════════
 const PICKS_API = "https://script.google.com/macros/s/AKfycbyybBxbgIfuDs7eiomADbRD0jHK0r8e2F3zYooopHV7vp8FpDbgNVTEJqE_qBU7bSY2/exec"; // ends in /exec
-const PICKS_LOCKED = true; // set true once knockout picks should be frozen
+const PICKS_LOCKED = true; // R32 picks are frozen — never re-opened
+// ─── R16 RE-PICK WINDOW ─────────────────────────────────────────────────
+// The original bracket showed wrong R16+ matchups, so everyone re-picks from
+// the Round of 16 onward against the CORRECT bracket. R32 picks & scores are
+// untouched. Set true to open the re-pick form; set false again to lock it.
+// R16 matchups are seeded from the ACTUAL R32 results (already known).
+const R16_REPICK_OPEN = true;
 // ─── PICK REVEAL DEADLINE ───────────────────────────────────────────────
 // Everyone's picks (names, champions, full brackets) stay HIDDEN from other
 // players until this moment. Each person can always see their OWN bracket.
@@ -340,18 +346,30 @@ const R32=[
   {id:"r32_16",a:"Egypt",b:"Australia"}
 ];
 // Later-round structure references winners of earlier ties.
+// Bracket linkages taken directly from the ESPN bracket (the same feed this app
+// reads results from), match numbers M89-M104. Verified: M89 Paraguay v France,
+// M90 Canada v Morocco, M91 Brazil v Norway, M92 Mexico v England.
 const R16=[
-  {id:"r16_1",from:["r32_1","r32_3"]},{id:"r16_2",from:["r32_2","r32_4"]},
-  {id:"r16_3",from:["r32_5","r32_7"]},{id:"r16_4",from:["r32_6","r32_8"]},
-  {id:"r16_5",from:["r32_9","r32_11"]},{id:"r16_6",from:["r32_10","r32_12"]},
-  {id:"r16_7",from:["r32_13","r32_15"]},{id:"r16_8",from:["r32_14","r32_16"]}
+  {id:"r16_1",from:["r32_13","r32_6"]},  // M89: Germany/Paraguay v France/Sweden
+  {id:"r16_2",from:["r32_1","r32_3"]},   // M90: SouthAfrica/Canada v Netherlands/Morocco
+  {id:"r16_3",from:["r32_5","r32_14"]},  // M91: Brazil/Japan v IvoryCoast/Norway
+  {id:"r16_4",from:["r32_4","r32_11"]},  // M92: Mexico/Ecuador v England/CongoDR
+  {id:"r16_5",from:["r32_8","r32_9"]},   // M93: Portugal/Croatia v Spain/Austria
+  {id:"r16_6",from:["r32_2","r32_7"]},   // M94: US/Bosnia v Belgium/Senegal
+  {id:"r16_7",from:["r32_10","r32_16"]}, // M95: Argentina/CapeVerde v Egypt/Australia
+  {id:"r16_8",from:["r32_15","r32_12"]}  // M96: Switzerland/Algeria v Colombia/Ghana
 ];
 const QF=[
-  {id:"qf_1",from:["r16_1","r16_2"]},{id:"qf_2",from:["r16_3","r16_4"]},
-  {id:"qf_3",from:["r16_5","r16_6"]},{id:"qf_4",from:["r16_7","r16_8"]}
+  {id:"qf_1",from:["r16_1","r16_2"]},    // M97: W89 v W90
+  {id:"qf_2",from:["r16_5","r16_6"]},    // M98: W93 v W94
+  {id:"qf_3",from:["r16_3","r16_4"]},    // M99: W91 v W92
+  {id:"qf_4",from:["r16_7","r16_8"]}     // M100: W95 v W96
 ];
-const SF=[{id:"sf_1",from:["qf_1","qf_2"]},{id:"sf_2",from:["qf_3","qf_4"]}];
-const FINAL=[{id:"final",from:["sf_1","sf_2"]}];
+const SF=[
+  {id:"sf_1",from:["qf_1","qf_2"]},      // M101: W97 v W98
+  {id:"sf_2",from:["qf_3","qf_4"]}       // M102: W99 v W100
+];
+const FINAL=[{id:"final",from:["sf_1","sf_2"]}]; // M104: W101 v W102
 const ROUNDS=[
   {key:"R32",label:"Round of 32",ties:R32},
   {key:"R16",label:"Round of 16",ties:R16},
@@ -1018,7 +1036,7 @@ function prunePicks(picks){
   return out;
 }
 
-function PicksView({allPicks,onSubmitted,onName}){
+function PicksView({allPicks,onSubmitted,onName,bracket}){
   const [name,setName]=useState("");
   const [picks,setPicks]=useState({});       // {tieId: teamName} across ALL rounds
   const [champion,setChampion]=useState("");
@@ -1026,64 +1044,81 @@ function PicksView({allPicks,onSubmitted,onName}){
   const [status,setStatus]=useState(null);
   const [errMsg,setErrMsg]=useState("");
 
+  const repick=R16_REPICK_OPEN;
+  // In re-pick mode, R16 matchups come from ACTUAL R32 results, so downstream ties
+  // resolve from the player's R16+ picks layered on top of the real R16 teams.
+  const resolveTeams=(pk)=>{
+    if(!repick)return resolvePlayerBracket(pk);
+    const teams={};
+    R32.forEach(t=>{teams[t.id]=[t.a,t.b];});
+    // R16 seeded from real R32 winners (bracket.teamsByTie already = actual winners)
+    R16.forEach(t=>{teams[t.id]=(bracket&&bracket.teamsByTie[t.id])||[null,null];});
+    [QF,SF,FINAL].forEach(rd=>rd.forEach(t=>{const[f1,f2]=t.from;teams[t.id]=[pk[f1]||null,pk[f2]||null];}));
+    return teams;
+  };
+  const prune=(pk)=>{
+    if(!repick)return prunePicks(pk);
+    let out={...pk};
+    for(let pass=0;pass<5;pass++){
+      const teams=resolveTeams(out);let changed=false;
+      [QF,SF,FINAL].forEach(rd=>rd.forEach(t=>{const[a,b]=teams[t.id];const c=out[t.id];if(c&&c!==a&&c!==b){delete out[t.id];changed=true;}}));
+      if(!changed)break;
+    }
+    return out;
+  };
+
   useEffect(()=>{
     const existing=allPicks[name.trim()];
     if(existing){setPicks(existing.picks||{});setChampion(existing.champion||"");setTbGoals(existing.tbGoals!=null?existing.tbGoals:"");}
   // eslint-disable-next-line
   },[name]);
 
-  if(PICKS_LOCKED)return <div>
+  if(PICKS_LOCKED&&!repick)return <div>
     <Banner title="Make Your Picks" sub="Picks are locked"/>
-    <div className="info">Knockout picks are locked — the Round of 32 has kicked off. Check the Bracket and Standings tabs to follow along.</div>
+    <div className="info">Knockout picks are locked. Check the Bracket and Standings tabs to follow along.</div>
   </div>;
   if(!PICKS_API||PICKS_API.includes("PASTE_YOUR")){
     return <div><Banner title="Make Your Picks" sub="Setup needed"/>
-      <div className="info">The picks backend isn't connected yet. Deploy the Google Apps Script and paste its URL into <strong>PICKS_API</strong> at the top of the file.</div></div>;
+      <div className="info">The picks backend isn't connected yet.</div></div>;
   }
 
-  const teams=resolvePlayerBracket(picks);
-  // Pick a winner for a tie, then prune now-invalid downstream picks + champion
-  const choose=(tieId,team)=>{
-    setPicks(prev=>{
-      const next={...prev,[tieId]:team};
-      const pruned=prunePicks(next);
-      return pruned;
-    });
-  };
-  // When final pick changes, keep champion in sync only if still valid
-  useEffect(()=>{
-    const finalTeams=resolvePlayerBracket(picks)[FINAL[0].id]||[];
-    if(champion&&!finalTeams.includes(champion)&&finalTeams.filter(Boolean).length){
-      // champion no longer reachable; leave for user to re-pick
-    }
-  // eslint-disable-next-line
-  },[picks]);
+  const teams=resolveTeams(picks);
+  const choose=(tieId,team)=>{ setPicks(prev=>prune({...prev,[tieId]:team})); };
 
-  // progress per round
+  // Rounds the player must pick. In re-pick mode: R16 onward only (R32 stays frozen).
+  const pickRounds=repick?ROUNDS.filter(r=>r.key!=="R32"):ROUNDS;
   const roundDone=k=>{const rd=ROUNDS.find(r=>r.key===k);return rd.ties.filter(t=>picks[t.id]).length;};
-  const allRoundsDone=ROUNDS.every(rd=>rd.ties.every(t=>picks[t.id]));
+  const allRoundsDone=pickRounds.every(rd=>rd.ties.every(t=>picks[t.id]));
   const finalTeams=teams[FINAL[0].id]||[];
   const finalWinner=picks[FINAL[0].id];
-  // champion options: the team the player picked to win the final (auto), but allow explicit confirm
-  const champOptions=finalTeams.filter(Boolean);
   const canSubmit=name.trim()&&allRoundsDone&&(finalWinner||champion)&&status!=="saving";
 
   const submit=async()=>{
     setStatus("saving");setErrMsg("");
-    const champ=champion||finalWinner||"";
+    const champ=finalWinner||champion||"";
+    // Preserve the player's frozen R32 picks exactly; only R16+ change in re-pick mode.
+    const existing=allPicks[name.trim()]||{};
+    const merged=repick?{...existing.picks,...picks}:picks;
+    // ensure R32 picks are the ORIGINAL ones, never overwritten
+    if(repick&&existing.picks)R32.forEach(t=>{if(existing.picks[t.id])merged[t.id]=existing.picks[t.id];});
     try{
-      const res=await fetch(PICKS_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({name:name.trim(),picks,champion:champ,tbGoals})});
+      const res=await fetch(PICKS_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({name:name.trim(),picks:merged,champion:champ,tbGoals})});
       const j=await res.json().catch(()=>({ok:false,error:"Bad response"}));
       if(j.ok){setStatus("ok");onSubmitted&&onSubmitted();}else{setStatus("err");setErrMsg(j.error||"Save failed");}
-    }catch(e){setStatus("err");setErrMsg("Network error — check the backend URL and try again.");}
+    }catch(e){setStatus("err");setErrMsg("Network error — try again.");}
   };
 
-  const totalTies=ROUNDS.reduce((s,r)=>s+r.ties.length,0);
-  const totalDone=ROUNDS.reduce((s,r)=>s+r.ties.filter(t=>picks[t.id]).length,0);
+  const totalTies=pickRounds.reduce((s,r)=>s+r.ties.length,0);
+  const totalDone=pickRounds.reduce((s,r)=>s+r.ties.filter(t=>picks[t.id]).length,0);
+  const hasEntry=name&&allPicks[name];
+  const r32Missing=repick&&hasEntry&&R32.some(t=>!allPicks[name].picks?.[t.id]);
 
   return <div>
-    <Banner title="Make Your Picks" sub="Fill out your full bracket — R32 all the way to the champion"/>
-    {status==="ok"&&<div className="pf-banner ok">✓ Bracket saved! Enter the same name anytime before lock to edit.</div>}
+    <Banner title={repick?"Re-pick R16 → Final":"Make Your Picks"} sub={repick?"The bracket after R32 was corrected — re-pick from here":"Fill out your full bracket"}/>
+    {repick&&<div className="info" style={{borderColor:"var(--gold)"}}>
+      <strong style={{color:"var(--gold)"}}>Why am I re-picking?</strong> The Round-of-16 matchups shown originally were wrong, so everyone re-picks from the R16 onward against the correct bracket. <strong>Your Round-of-32 picks and points are frozen and unchanged</strong> — you're only choosing R16 → Final again. Matchups below are built from the actual R32 results.
+    </div>}
+    {status==="ok"&&<div className="pf-banner ok">✓ Saved! Pick your name again anytime to adjust before this round locks.</div>}
     {status==="err"&&<div className="pf-banner err">⚠ {errMsg}</div>}
 
     <div className="pf-field">
@@ -1092,20 +1127,21 @@ function PicksView({allPicks,onSubmitted,onName}){
         <option value="">Select your name…</option>
         {PARTICIPANTS.map(n=><option key={n} value={n}>{n}</option>)}
       </select>
-      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Pick your name to start or edit your bracket. Progress: {totalDone}/{totalTies} picks.</div>
+      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>{repick?`Pick your name to re-do R16 onward. Progress: ${totalDone}/${totalTies}`:`Progress: ${totalDone}/${totalTies} picks.`}</div>
     </div>
 
-    {ROUNDS.map(rd=>{
+    {repick&&name&&!hasEntry&&<div className="info" style={{borderColor:"var(--red)"}}>No existing bracket found for {name}. Re-picking is for players who already submitted an R32 bracket.</div>}
+
+    {(!repick||name)&&pickRounds.map(rd=>{
       const done=roundDone(rd.key);
-      // a round is pickable once all its feeder ties are decided (R32 always pickable)
       return <div key={rd.key}>
         <div className="sectionhead">{rd.label} <span className="cnt">{done}/{rd.ties.length}</span></div>
         {rd.ties.map(t=>{
           const [a,b]=teams[t.id]||[null,null];
-          const ready=a&&b; // both feeder picks made
+          const ready=a&&b;
           if(!ready)return <div className="pf-match" key={t.id}>
             <div className="pf-match-h">{rd.label} matchup</div>
-            <div className="pf-opt" style={{cursor:"default",color:"var(--dim)"}}><span className="nm">Pick the earlier rounds first…</span></div>
+            <div className="pf-opt" style={{cursor:"default",color:"var(--dim)"}}><span className="nm">{rd.key==="R16"?"Awaiting R32 result…":"Pick the earlier rounds first…"}</span></div>
           </div>;
           return <div className="pf-match" key={t.id}>
             <div className="pf-match-h">{a} (#{SEED[a]||"–"}) vs {b} (#{SEED[b]||"–"})</div>
@@ -1125,6 +1161,7 @@ function PicksView({allPicks,onSubmitted,onName}){
       </div>;
     })}
 
+    {(!repick||name)&&<>
     <div className="sectionhead">🏆 Champion</div>
     {finalWinner
       ? <div className="pf-match"><div className="pf-match-h">Your bracket champion</div>
@@ -1136,13 +1173,14 @@ function PicksView({allPicks,onSubmitted,onName}){
     <div className="pf-field">
       <div className="pf-label">⚽ Tiebreaker — total goals scored in the knockout stage</div>
       <input className="pf-input" type="number" value={tbGoals} onChange={e=>setTbGoals(e.target.value)} placeholder="e.g. 140" />
-      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Your best guess at total goals across all knockout matches (R32 → Final). Closest wins ties.</div>
+      <div className="pf-prog" style={{textAlign:"left",marginTop:6}}>Total goals across all knockout matches (R32 → Final). Closest wins ties.</div>
     </div>
 
-    <button className="pf-submit" disabled={!canSubmit} onClick={submit}>{status==="saving"?"Saving…":status==="ok"?"✓ Saved — submit again to update":"Submit bracket"}</button>
-    {status==="ok"&&<div className="pf-banner ok" style={{margin:"0 16px 4px"}}>✓ Your bracket is saved! It now shows on the Standings &amp; Bracket tabs. You can change it anytime before kickoff.</div>}
+    <button className="pf-submit" disabled={!canSubmit} onClick={submit}>{status==="saving"?"Saving…":status==="ok"?"✓ Saved — submit again to update":repick?"Submit R16 → Final picks":"Submit bracket"}</button>
+    {status==="ok"&&<div className="pf-banner ok" style={{margin:"0 16px 4px"}}>✓ Saved! Your R32 picks stayed frozen; R16 onward updated. Shows on Standings &amp; Bracket.</div>}
     {status==="err"&&<div className="pf-banner err" style={{margin:"0 16px 4px"}}>⚠ {errMsg}</div>}
     {!canSubmit&&status!=="saving"&&status!=="ok"&&<div className="pf-note">{!name.trim()?"Pick your name":!allRoundsDone?`Complete every round (${totalDone}/${totalTies} picks made)`:"Pick your Final winner"}</div>}
+    </>}
   </div>;
 }
 
@@ -1185,12 +1223,12 @@ function App(){
 
   return <>
     <div className="hdr"><div className="hdr-title"><span className="ball">⚽</span>K&amp;M Knockout Pool</div><div className="hdr-sub">2026 World Cup · Round of 32 → Final</div></div>
-    <div className="tabs">{[["standings","Standings"],["bracket","Bracket"],["scores","Scores"],["stats","Stats"],...(PICKS_LOCKED?[]:[["picks","Picks"]])].map(([k,l])=><button key={k} className={`tab ${view===k?"on":""}`} onClick={()=>setView(k)}>{l}</button>)}</div>
+    <div className="tabs">{[["standings","Standings"],["bracket","Bracket"],["scores","Scores"],["stats","Stats"],...((!PICKS_LOCKED||R16_REPICK_OPEN)?[["picks",R16_REPICK_OPEN?"Re-pick":"Picks"]]:[])].map(([k,l])=><button key={k} className={`tab ${view===k?"on":""}`} onClick={()=>setView(k)}>{l}</button>)}</div>
     {view==="standings"&&<Leaderboard allPicks={allPicks} bracket={bracket} myName={myName} goToPicks={()=>setView("picks")}/>}
     {view==="bracket"&&<BracketView allPicks={allPicks} bracket={bracket} myName={myName}/>}
     {view==="scores"&&<ScoresView matches={matches} lastUpdated={lastUpdated} onRefresh={fetchLive} liveStatus={liveStatus} allPicks={allPicks} bracket={bracket}/>}
     {view==="stats"&&<StatsView stats={stats} matches={matches} lastUpdated={lastUpdated} onRefresh={fetchLive} liveStatus={liveStatus}/>}
-    {view==="picks"&&!PICKS_LOCKED&&<PicksView allPicks={allPicks} onSubmitted={loadPicks} onName={setMyName}/>}
+    {view==="picks"&&(!PICKS_LOCKED||R16_REPICK_OPEN)&&<PicksView allPicks={allPicks} onSubmitted={loadPicks} onName={setMyName} bracket={bracket}/>}
     <div className="foot">K&amp;M World Cup Knockout Pool · © Kreag · data via ESPN</div></>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
