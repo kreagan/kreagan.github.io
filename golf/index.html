@@ -389,6 +389,14 @@ const SF=[
   {id:"sf_2",from:["qf_3","qf_4"]}       // M102: W99 v W100
 ];
 const FINAL=[{id:"final",from:["sf_1","sf_2"]}]; // M104: W101 v W102
+// Top-to-bottom R32 ordering for the VISUAL bracket. Walk the tree from the Final down
+// so that ties feeding the same later match are always adjacent — this makes the bracket
+// render as a clean nested tree (no crossing connectors) at every round.
+const BRACKET_ORDER=(()=>{
+  const byId={};[...R16,...QF,...SF,...FINAL].forEach(t=>{byId[t.id]=t;});
+  const leaves=(id)=>id.startsWith("r32_")?[id]:[...leaves(byId[id].from[0]),...leaves(byId[id].from[1])];
+  return leaves("final");   // array of r32 tie ids, top→bottom
+})();
 const ROUNDS=[
   {key:"R32",label:"Round of 32",ties:R32},
   {key:"R16",label:"Round of 16",ties:R16},
@@ -799,7 +807,7 @@ function VisualPlayerBracket({pick,bracket,who}){
         // centered on its two feeders.
         const slot=BODY/16;                    // vertical space per R32 slot
         const yById={};
-        R32.forEach((t,i)=>{yById[t.id]=HEADER+slot*(i+0.5);});
+        BRACKET_ORDER.forEach((id,i)=>{yById[id]=HEADER+slot*(i+0.5);});
         [R16,QF,SF,FINAL].forEach(rd=>rd.forEach(t=>{
           const [f1,f2]=t.from;
           yById[t.id]=((yById[f1]||0)+(yById[f2]||0))/2;
@@ -891,7 +899,7 @@ function VisualBracket({bracket}){
         {(()=>{
           const slot=BODY/16;
           const yById={};
-          R32.forEach((t,i)=>{yById[t.id]=HEADER+slot*(i+0.5);});
+          BRACKET_ORDER.forEach((id,i)=>{yById[id]=HEADER+slot*(i+0.5);});
           [R16,QF,SF,FINAL].forEach(rd=>rd.forEach(t=>{const[f1,f2]=t.from;yById[t.id]=((yById[f1]||0)+(yById[f2]||0))/2;}));
           const colW=1/ROUNDS.length*100;
           return ROUNDS.map((rd,ci)=>(
