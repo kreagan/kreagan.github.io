@@ -122,13 +122,13 @@ button{font-family:inherit}
 
 /* visual bracket */
 .vb-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 4px;padding:0 16px 8px}
-.vb{display:flex;min-width:600px;gap:0}
-.vb-round{display:flex;flex-direction:column;min-width:118px;flex:1;padding:0 5px}
-.vb-rh{flex:0 0 auto;text-align:center;font-family:var(--fm);font-size:10px;font-weight:700;color:var(--gold);letter-spacing:.5px;padding:4px 0 8px;text-transform:uppercase}
-.vb-body{flex:1;display:flex;flex-direction:column;justify-content:space-around}
+.vb{min-width:640px;gap:0}
+.vb-col{position:absolute;top:0;bottom:0;min-width:118px}
+.vb-col .vb-rh{position:absolute;top:-2px;left:5px;right:5px}
+.vb-rh{text-align:center;font-family:var(--fm);font-size:10px;font-weight:700;color:var(--gold);letter-spacing:.5px;padding:4px 0 8px;text-transform:uppercase}
 .vb-match{background:var(--panel);border:1px solid var(--bd);border-radius:8px;overflow:hidden;position:relative}
-.vb-round:not(:last-child) .vb-match::after{content:"";position:absolute;right:-5px;top:50%;width:5px;height:1px;background:var(--bd)}
-.vb-round:not(:first-child) .vb-match::before{content:"";position:absolute;left:-5px;top:50%;width:5px;height:1px;background:var(--bd)}
+.vb-col:not(:last-child) .vb-match::after{content:"";position:absolute;right:-5px;top:50%;width:5px;height:1px;background:var(--bd)}
+.vb-col:not(:first-child) .vb-match::before{content:"";position:absolute;left:-5px;top:50%;width:5px;height:1px;background:var(--bd)}
 .vb-team{display:flex;align-items:center;gap:5px;padding:5px 7px;font-size:12px}
 .vb-team+.vb-team{border-top:1px solid rgba(255,255,255,.05)}
 .vb-pts{font-family:var(--fm);font-size:9px;text-align:center;padding:2px 4px;letter-spacing:.3px;border-top:1px solid rgba(255,255,255,.06)}
@@ -390,6 +390,14 @@ const SF=[
   {id:"sf_2",from:["qf_3","qf_4"]}       // M102: W99 v W100
 ];
 const FINAL=[{id:"final",from:["sf_1","sf_2"]}]; // M104: W101 v W102
+// Top-to-bottom R32 ordering for the VISUAL bracket. Walk the tree from the Final down
+// so that ties feeding the same later match are always adjacent — this makes the bracket
+// render as a clean nested tree (no crossing connectors) at every round.
+const BRACKET_ORDER=(()=>{
+  const byId={};[...R16,...QF,...SF,...FINAL].forEach(t=>{byId[t.id]=t;});
+  const leaves=(id)=>id.startsWith("r32_")?[id]:[...leaves(byId[id].from[0]),...leaves(byId[id].from[1])];
+  return leaves("final");   // array of r32 tie ids, top→bottom
+})();
 const ROUNDS=[
   {key:"R32",label:"Round of 32",ties:R32},
   {key:"R16",label:"Round of 16",ties:R16},
@@ -762,7 +770,9 @@ function pickStatus(team,tieId,bracket){
 // A player's full predicted bracket, visual + color-coded by correctness.
 function VisualPlayerBracket({pick,bracket,who}){
   const myTeams=resolvePlayerBracket(pick.picks||{},bracket);
-  const H=16*70;
+  const BODY=16*70;          // vertical space for the 16 R32 slots
+  const HEADER=26;           // room for round labels
+  const H=BODY+HEADER+8;     // total container height
   const champ=pick.champion;
   const champStatus=champ?pickStatus(champ,"final",bracket):"pending";
   const sc=scorePlayer(pick,bracket);
@@ -790,22 +800,34 @@ function VisualPlayerBracket({pick,bracket,who}){
       <span><span className="dot-key" style={{background:"var(--dim)"}}></span>Still alive (points possible)</span>
       <span style={{marginLeft:"auto",color:"var(--dim)",fontFamily:"var(--fm)",fontSize:12}}>scroll sideways →</span>
     </div>
-    <div className="vb-wrap"><div className="vb" style={{height:H+"px"}}>
-      {ROUNDS.map(rd=>(
-        <div className="vb-round" key={rd.key}>
-          <div className="vb-rh">{rd.key}</div>
-          <div className="vb-body">
+    <div className="vb-wrap"><div className="vb" style={{height:H+"px",position:"relative"}}>
+      {(()=>{
+        // Compute a vertical center (in px) for every tie so each round's boxes sit
+        // exactly between the two boxes that feed them — a true bracket tree that
+        // can never visually misalign. R32 ties are evenly spaced; each later tie is
+        // centered on its two feeders.
+        const slot=BODY/16;                    // vertical space per R32 slot
+        const yById={};
+        BRACKET_ORDER.forEach((id,i)=>{yById[id]=HEADER+slot*(i+0.5);});
+        [R16,QF,SF,FINAL].forEach(rd=>rd.forEach(t=>{
+          const [f1,f2]=t.from;
+          yById[t.id]=((yById[f1]||0)+(yById[f2]||0))/2;
+        }));
+        const colW=1/ROUNDS.length*100;
+        return ROUNDS.map((rd,ci)=>(
+          <div className="vb-col" key={rd.key} style={{left:`${ci*colW}%`,width:`${colW}%`}}>
+            <div className="vb-rh">{rd.key}</div>
             {rd.ties.map(t=>{
-              const advancing=pick.picks?.[t.id];        // the team this player advanced from this tie
-              const [a,b]=myTeams[t.id]||[null,null];     // the two teams they had meeting here
-              // points this pick is worth = base round points + underdog bonus vs its opponent
+              const advancing=pick.picks?.[t.id];
+              const [a,b]=myTeams[t.id]||[null,null];
               let ptsWorth=0,pickSt="pending";
               if(advancing&&a&&b){
                 const opp=toApp(a)===toApp(advancing)?b:a;
                 ptsWorth=SCORING.knockout[rd.key]+(opp?underdogBonus(advancing,opp,rd.key):0);
                 pickSt=pickStatus(advancing,t.id,bracket);
               }
-              return <div className="vb-match" key={t.id}>
+              const top=(yById[t.id]||0);
+              return <div className="vb-match" key={t.id} style={{position:"absolute",top:`${top}px`,transform:"translateY(-50%)",left:"5px",right:"5px"}}>
                 {[a,b].map((team,idx)=>{
                   const isPick=team&&advancing&&toApp(team)===toApp(advancing);
                   const st=isPick?pickStatus(team,t.id,bracket):(team&&(bracket.eliminated||new Set()).has(toApp(team))?"gone":"");
@@ -822,8 +844,8 @@ function VisualPlayerBracket({pick,bracket,who}){
               </div>;
             })}
           </div>
-        </div>
-      ))}
+        ));
+      })()}
     </div></div>
     <div className={`vb-champ ${champStatus==="correct"?"champ-ok":champStatus==="wrong"?"champ-no":""}`}>
       <span className="vb-champ-l">🏆 {who}'s champion</span>
@@ -869,29 +891,34 @@ function PlayerBracket({pick,bracket}){
 function seedLabel(team){const r=SEED[team];return r?`#${r}`:"";}
 function teamCode(team){return team?(LOGO[team]||team.slice(0,3)).toUpperCase():"TBD";}
 function VisualBracket({bracket}){
-  // Linear bracket: R32 → Final. Top half (r32_1..8) → SF1, bottom half (r32_9..16) → SF2.
-  const H=16*52; // total bracket body height (16 R32 slots)
+  const BODY=16*54,HEADER=26,H=BODY+HEADER+8;
   const champ=bracket.winnerByTie["final"];
   return <div>
     <div className="info" style={{marginTop:8,marginBottom:6}}>Scroll sideways to follow each path. The <strong>top half</strong> and <strong>bottom half</strong> meet in the Final. Winners advance in <span style={{color:"var(--grn)"}}>green</span>.</div>
     <div className="vb-wrap">
-      <div className="vb" style={{height:H+"px"}}>
-        {ROUNDS.map(rd=>(
-          <div className="vb-round" key={rd.key}>
-            <div className="vb-rh">{rd.key}</div>
-            <div className="vb-body">
+      <div className="vb" style={{height:H+"px",position:"relative"}}>
+        {(()=>{
+          const slot=BODY/16;
+          const yById={};
+          BRACKET_ORDER.forEach((id,i)=>{yById[id]=HEADER+slot*(i+0.5);});
+          [R16,QF,SF,FINAL].forEach(rd=>rd.forEach(t=>{const[f1,f2]=t.from;yById[t.id]=((yById[f1]||0)+(yById[f2]||0))/2;}));
+          const colW=1/ROUNDS.length*100;
+          return ROUNDS.map((rd,ci)=>(
+            <div className="vb-col" key={rd.key} style={{left:`${ci*colW}%`,width:`${colW}%`}}>
+              <div className="vb-rh">{rd.key}</div>
               {rd.ties.map(t=>{
                 const [a,b]=bracket.teamsByTie[t.id]||[null,null];
                 const w=bracket.winnerByTie[t.id];
                 const aw=w&&toApp(w)===toApp(a),bw=w&&toApp(w)===toApp(b);
-                return <div className="vb-match" key={t.id}>
+                const top=yById[t.id]||0;
+                return <div className="vb-match" key={t.id} style={{position:"absolute",top:`${top}px`,transform:"translateY(-50%)",left:"5px",right:"5px"}}>
                   <div className={`vb-team ${aw?"win":w?"out":""}`}><Flag team={a} size="sm"/><span className="c">{teamCode(a)}</span></div>
                   <div className={`vb-team ${bw?"win":w?"out":""}`}><Flag team={b} size="sm"/><span className="c">{teamCode(b)}</span></div>
                 </div>;
               })}
             </div>
-          </div>
-        ))}
+          ));
+        })()}
       </div>
     </div>
     <div className="vb-champ"><span className="vb-champ-l">🏆 Champion</span><span className="vb-champ-v">{champ?<><Flag team={champ} size="sm"/>{champ}</>:"TBD"}</span></div>
