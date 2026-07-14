@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -248,7 +247,7 @@ function Countdown({targetDate}){
       <span className="cd-time">{left}</span></>}</div>;}
 
 // ─── LEADERBOARD ───
-function LeaderboardView({tournament,picks,scores,lastUpdated,onRefresh,liveStatus,autoRefresh,setAutoRefresh}){
+function LeaderboardView({tournament,picks,scores,lastUpdated,onRefresh,liveStatus,autoRefresh,setAutoRefresh,picksOpen}){
   const tiers=useMemo(()=>buildTiers(DEFAULT_ODDS),[]);
   const lb=useMemo(()=>Object.entries(picks).map(([n,d])=>({name:n,tb:d.tiebreaker,...calcScore(d.picks,scores)}))
     .sort((a,b)=>{if(a.total==null&&b.total==null)return 0;if(a.total==null)return 1;if(b.total==null)return -1;
@@ -263,13 +262,14 @@ function LeaderboardView({tournament,picks,scores,lastUpdated,onRefresh,liveStat
     {has&&<RefreshTimer lastUpdated={lastUpdated} onRefresh={onRefresh} liveStatus={liveStatus} autoRefresh={autoRefresh} setAutoRefresh={setAutoRefresh}/>}
     {!has&&<div className="info"><strong>Waiting for scores</strong> — Tournament hasn't started or scores haven't been imported.</div>}
     <div className="lb"><div className="lb-h"><span className="lb-r">#</span><span className="lb-n">Player</span>
-      <span className="lb-sc">Best 4</span><span className="lb-tb hide-mobile">TB</span></div>
-    {lb.map((e,i)=><div key={e.name}><div className={`lb-row ${i%2===0?"ev":"od"}`} onClick={()=>setExp(exp===e.name?null:e.name)}>
+      <span className="lb-sc">Best 4</span>{!picksOpen&&<span className="lb-tb hide-mobile">TB</span>}</div>
+    {picksOpen&&<div className="info" style={{margin:"4px 0 8px",display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18}}>🙈</span><span>Individual picks are hidden until the first tee — tap-to-expand and tiebreakers reveal once play begins.</span></div>}
+    {lb.map((e,i)=><div key={e.name}><div className={`lb-row ${i%2===0?"ev":"od"}`} onClick={()=>{if(!picksOpen)setExp(exp===e.name?null:e.name);}} style={picksOpen?{cursor:"default"}:{}}>
       <span className={`lb-r ${pos[i]<=3&&has?"t3":""}`}>{pos[i]===1&&has?"🥇":pos[i]===2&&has?"🥈":pos[i]===3&&has?"🥉":pos[i]}</span>
-      <span className="lb-n lb-nt">{e.name}<span className="exp-a">{exp===e.name?"▲":"▼"}</span></span>
+      <span className="lb-n lb-nt">{e.name}{!picksOpen&&<span className="exp-a">{exp===e.name?"▲":"▼"}</span>}</span>
       <span className={`lb-sc sv ${e.total==null?"n":e.total<0?"u":e.total>0?"o":"ep"}`}>{fmt(e.total)}</span>
-      <span className="lb-tb tb-v hide-mobile">{e.tb}</span></div>
-    {exp===e.name&&<div className="lb-d"><div className="dg dg-rounds">
+      {!picksOpen&&<span className="lb-tb tb-v hide-mobile">{e.tb}</span>}</div>
+    {!picksOpen&&exp===e.name&&<div className="lb-d"><div className="dg dg-rounds">
       <span className="dh">Golfer</span><span className="dh r">Tot</span><span className="dh r hide-mobile-sm">R1</span><span className="dh r hide-mobile-sm">R2</span><span className="dh r hide-mobile-sm">R3</span><span className="dh r hide-mobile-sm">R4</span><span className="dh r">Thru</span>
       {e.golfers.map((g,j)=>{const p=parseOdds(g.raw);const tk=getTier(g.raw,tiers);const rd=g.rounds||[null,null,null,null];return[
         <span key={`n${j}`} className={`dn ${g.counting?"ct":""}`}>{g.counting&&<span className="dot"/>}{g.name}
@@ -287,7 +287,7 @@ function LeaderboardView({tournament,picks,scores,lastUpdated,onRefresh,liveStat
   </div>;}
 
 // ─── TEAMS (new detail view) ───
-function TeamsView({picks,scores}){
+function TeamsView({picks,scores,picksOpen}){
   const tiers=useMemo(()=>buildTiers(DEFAULT_ODDS),[]);
   const[selected,setSelected]=useState(null);
   const names=Object.keys(picks).sort();
@@ -297,6 +297,20 @@ function TeamsView({picks,scores}){
     const n=parseOdds(p).name;m[n]=(m[n]||0)+1;}));return m;},[picks]);
 
   if(!names.length)return <div className="empty"><p className="empty-b">No picks yet</p></div>;
+
+  // While picks are still open, keep everyone's selections hidden so people can't copy
+  // each other. Show only who's submitted; reveal all teams once the first ball is struck.
+  if(picksOpen)return <div>
+    <div className="info" style={{display:"flex",alignItems:"center",gap:10}}>
+      <span style={{fontSize:22}}>🙈</span>
+      <span><strong>Picks are hidden until the first tee.</strong> Everyone's teams reveal automatically once play begins — no peeking while entries are still open.</span>
+    </div>
+    <div className="sub-track" style={{marginTop:12}}>
+      <span className="sub-ct">{names.length}</span><span> submitted</span>
+      <div style={{flex:1}}/>
+      {names.length>0&&<span className="sub-names">{names.join(", ")}</span>}
+    </div>
+  </div>;
 
   const current=selected||names[0];
   const data=picks[current];
@@ -1655,8 +1669,8 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
   `}</style>
   <div style={{maxWidth:800,margin:"0 auto",padding:"16px 16px 48px",minHeight:"100vh"}}>
     <Header view={view} setView={setView} isAdmin={isAdmin} picksOpen={picksOpen}/>
-    {view==="leaderboard"&&<LeaderboardView tournament={tournament} picks={picks} scores={scores} lastUpdated={lastUpdated} onRefresh={handleRefresh} liveStatus={liveStatus} autoRefresh={autoRefresh} setAutoRefresh={setAutoRefresh}/>}
-    {view==="teams"&&<TeamsView picks={picks} scores={scores}/>}
+    {view==="leaderboard"&&<LeaderboardView tournament={tournament} picks={picks} scores={scores} lastUpdated={lastUpdated} onRefresh={handleRefresh} liveStatus={liveStatus} autoRefresh={autoRefresh} setAutoRefresh={setAutoRefresh} picksOpen={picksOpen}/>}
+    {view==="teams"&&<TeamsView picks={picks} scores={scores} picksOpen={picksOpen}/>}
     {view==="scoreboard"&&<ScoreboardView tournament={tournament} scores={scores} picks={picks} lastUpdated={lastUpdated} onRefresh={handleRefresh} liveStatus={liveStatus} autoRefresh={autoRefresh} setAutoRefresh={setAutoRefresh} coursePars={coursePars} prevPositions={prevPositions} espnEventId={espnEventId}/>}
     {view==="picks"&&picksOpen&&<PicksView tournament={tournament} tiers={tiers} existingPicks={picks} onSubmit={onPick} onSubmitted={loadPicks} participants={PARTICIPANTS}/>}
     {view==="history"&&<HistoryView history={history}/>}
