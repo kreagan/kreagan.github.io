@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>K&M Major Pool ⛳</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
+<meta property="og:title" content="K&M Major Pool"/>
+<meta property="og:description" content="Live leaderboard for K&M Major Pool – best 4 of 7 picks across tiers"/>
+<meta property="og:image" content="https://kreagan.github.io/static/css/img/nuble.jpg"/>
+<meta property="og:type" content="website"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="K&M Major Pool"/>
+<meta name="twitter:description" content="Live leaderboard for K&M Major Pool – best 4 of 7 picks across tiers"/>
+<meta name="twitter:image" content="https://kreagan.github.io/static/css/img/nuble.jpg"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
@@ -651,22 +659,30 @@ function PicksView({tournament,tiers,existingPicks,onSubmit,onSubmitted,particip
     // Update local state immediately for a snappy UI
     onSubmit&&onSubmit(entry);
     // Persist to the Google Sheet backend.
-    // Apps Script doesn't return CORS headers, so a normal fetch that reads the response
-    // is blocked by the browser (even though the write succeeds). We send a "simple"
-    // no-cors POST — the write goes through; we just can't read the reply — then confirm
-    // by re-loading everyone's picks via GET (GET works fine from Apps Script).
+    // A "simple" POST with a text/plain body skips the CORS preflight that Apps Script
+    // can't answer, so doPost runs AND we can read the JSON reply. (Do NOT use no-cors —
+    // that makes the response opaque and, worse, can prevent the write from registering.)
     if(PICKS_API&&!PICKS_API.includes("PASTE_YOUR")){
       setSaving(true);setErr("");
+      let confirmed=false;
       try{
-        await fetch(PICKS_API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},
+        const res=await fetch(PICKS_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
           body:JSON.stringify({name:entry.name,tiebreaker:entry.tiebreaker,picks:entry.picks})});
-        // Can't read a no-cors response; give the sheet a moment, then reload to verify.
-        await new Promise(r=>setTimeout(r,800));
+        const j=await res.json().catch(()=>null);
+        if(j&&j.ok===false){setSaving(false);setErr(j.error||"Save failed — try again.");return;}
+        confirmed=!!(j&&j.ok);
+      }catch(e){
+        // Reading the response may still be blocked in some setups even though the write
+        // succeeded — fall through and verify via GET rather than failing outright.
+      }
+      // Verify by re-reading the sheet (GET), whether or not we could read the POST reply.
+      try{
+        await new Promise(r=>setTimeout(r,600));
         if(onSubmitted){
-          const ok=await onSubmitted();          // returns true if this name now appears in the sheet
-          if(ok===false){setSaving(false);setErr("Saved, but couldn't confirm — check the leaderboard.");}
+          const loaded=await onSubmitted();
+          if(!confirmed&&loaded===false){setSaving(false);setErr("Couldn't confirm the save reached the sheet — check your Apps Script deployment (Execute as: Me · Access: Anyone).");return;}
         }
-      }catch(e){setSaving(false);setErr("Network error — try again.");return;}
+      }catch(e){}
       setSaving(false);
     }
     setDone(true);};
