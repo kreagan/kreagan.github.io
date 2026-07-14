@@ -41,7 +41,7 @@ const DEFAULT_ODDS = [
   "Nick Taylor +16500","Daniel Berger +20000","Davis Thompson +22000","Ryan Fox +25000",
   "Thomas Detry +25000","Byeong Hun An +25000","Jhonattan Vegas +28000","Matt Wallace +28000",
   "Lucas Glover +30000","Justin Leonard +40000","Padraig Harrington +50000","Henrik Stenson +80000",
-  "Max Homa +40000","Aldrich Potgieter +30000","Joe Dean +100000"
+  "Max Homa +40000","Aldrich Potgieter +30000","Joe Dean +100000","Tony P Scrooth +696900"
 ];
 
 // ─── CURRENT TOURNAMENT PICKS ───
@@ -54,6 +54,7 @@ const PICKS_2026 = {
 // Scores loaded live from ESPN via Cloudflare Worker
 
 const POOL_HISTORY = [
+  {id:"2026-us",name:"2026 US Open",venue:"Shinnecock Hills",status:"completed",champ:"Wyndham Clark",champScore:-4,poolWinner:"Timmy",poolScore:0,participants:["Timmy","Dirk","Kreag","Nuble","Polaris","Nate","Fjord","Farthead","Teej"]},
   {id:"2026-pga",name:"2026 PGA Championship",venue:"Aronimink Golf Club",status:"completed",champ:"Aaron Rai",champScore:-9,poolWinner:"Polaris",poolScore:-14,participants:["Polaris","Nate","Tony","Nuble","Timmy","Fjord","Farthead","Kreag","Teej"]},
   {id:"2026-m",name:"2026 Masters",venue:"Augusta National",status:"completed",champ:"Rory McIlroy",champScore:-12,poolWinner:"Polaris",poolScore:-41,participants:["Polaris","Christian","Teej","Kreag","Tony","SOD","Nuble","Farthead","Timmy","Nate","Dirk"]},
   {id:"2025-bo",name:"2025 British Open",venue:"Royal Portrush",status:"completed",champ:"Scottie Scheffler",champScore:-17,poolWinner:"Fjord",poolScore:-47,participants:["Polaris","Fjord","Kreag","Nuble","Timmy","Teej","Farthead"]},
@@ -121,6 +122,7 @@ const POOL_RESULTS = {
   "2025-us": [{n:"Nuble",s:17,tb:-7},{n:"Farthead",s:25,tb:-3},{n:"Timmy",s:30,tb:-1},{n:"Polaris",s:33,tb:-4},{n:"Teej",s:null,tb:-6},{n:"Nate",s:null,tb:-6},{n:"Fjord",s:null,tb:-10}],
   "2025-bo": [{n:"Fjord",s:-31,tb:-8},{n:"Farthead",s:-30,tb:-14},{n:"Timmy",s:-25,tb:-12},{n:"Kreag",s:-24,tb:-13},{n:"Polaris",s:-23,tb:-10},{n:"Teej",s:-19,tb:-14},{n:"Nuble",s:-10,tb:-14}],
   "2026-m": [{n:"Polaris",s:-41,tb:-13},{n:"Christian",s:-37,tb:-16},{n:"Teej",s:-35,tb:-12},{n:"Kreag",s:-33,tb:-13},{n:"Tony",s:-29,tb:-12},{n:"SOD",s:-25,tb:-12},{n:"Nuble",s:-23,tb:-13},{n:"Farthead",s:-23,tb:-13},{n:"Timmy",s:-21,tb:-14},{n:"Nate",s:-17,tb:-11},{n:"Dirk",s:-4,tb:-11}],
+  "2026-us": [{n:"Timmy",s:0,tb:-3},{n:"Dirk",s:1,tb:-6},{n:"Kreag",s:2,tb:-8},{n:"Nuble",s:7,tb:-7},{n:"Polaris",s:11,tb:-4},{n:"Nate",s:12,tb:-4},{n:"Fjord",s:14,tb:-1},{n:"Farthead",s:14,tb:-3},{n:"Teej",s:14,tb:-7}],
   "2026-pga": [{n:"Polaris",s:-14,tb:-15},{n:"Nate",s:-12,tb:-17},{n:"Tony",s:-10,tb:-13},{n:"Nuble",s:-9,tb:-16},{n:"Timmy",s:-5,tb:-16},{n:"Fjord",s:-4,tb:-16},{n:"Farthead",s:-4,tb:-16},{n:"Kreag",s:-3,tb:-16},{n:"Teej",s:-2,tb:-16}],
 };
 
