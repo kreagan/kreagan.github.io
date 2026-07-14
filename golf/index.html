@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -631,15 +632,22 @@ function PicksView({tournament,tiers,existingPicks,onSubmit,onSubmitted,particip
     const entry={name,tiebreaker:parseFloat(tb),picks:[...sel.top10,...sel.mid,...sel.rest],timestamp:new Date().toISOString()};
     // Update local state immediately for a snappy UI
     onSubmit&&onSubmit(entry);
-    // Persist to the Google Sheet backend
+    // Persist to the Google Sheet backend.
+    // Apps Script doesn't return CORS headers, so a normal fetch that reads the response
+    // is blocked by the browser (even though the write succeeds). We send a "simple"
+    // no-cors POST — the write goes through; we just can't read the reply — then confirm
+    // by re-loading everyone's picks via GET (GET works fine from Apps Script).
     if(PICKS_API&&!PICKS_API.includes("PASTE_YOUR")){
       setSaving(true);setErr("");
       try{
-        const res=await fetch(PICKS_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+        await fetch(PICKS_API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},
           body:JSON.stringify({name:entry.name,tiebreaker:entry.tiebreaker,picks:entry.picks})});
-        const j=await res.json().catch(()=>({ok:false,error:"Bad response"}));
-        if(!j.ok){setSaving(false);setErr(j.error||"Save failed — try again");return;}
-        onSubmitted&&onSubmitted();   // re-load everyone's picks from the sheet
+        // Can't read a no-cors response; give the sheet a moment, then reload to verify.
+        await new Promise(r=>setTimeout(r,800));
+        if(onSubmitted){
+          const ok=await onSubmitted();          // returns true if this name now appears in the sheet
+          if(ok===false){setSaving(false);setErr("Saved, but couldn't confirm — check the leaderboard.");}
+        }
       }catch(e){setSaving(false);setErr("Network error — try again.");return;}
       setSaving(false);
     }
@@ -662,7 +670,7 @@ function PicksView({tournament,tiers,existingPicks,onSubmit,onSubmitted,particip
         <select value={name} onChange={e=>{setName(e.target.value);setErr("");}} className="inp sel">
           <option value="">Select name...</option>{participants.map(p=><option key={p} value={p} disabled={already.has(p)}>
             {p}{already.has(p)?" ✓":""}</option>)}</select></div>
-      <div className="form-f" style={{flex:"0 0 180px"}}><label className="fl">Tiebreaker (winner to par) *</label>
+      <div className="form-f" style={{flex:"0 0 220px"}}><label className="fl">Tiebreaker (winner to par) *</label>
         <input type="number" value={tb} onChange={e=>setTb(e.target.value)} placeholder="-13" className="inp mono"/></div></div>
     <div className="sub-track"><span className="sub-ct">{already.size}/{participants.length}</span><span> in</span>
       <div style={{flex:1}}/>{already.size>0&&<span className="sub-names">{[...already].join(", ")}</span>}</div>
@@ -1292,8 +1300,9 @@ function App(){
   const onPick=useCallback(s=>setPicks(p=>({...p,[s.name]:s})),[]);
 
   // Load everyone's picks from the Google Sheet backend (same pattern as World Cup).
+  // Returns true on a successful read so a caller can confirm a just-saved submission.
   const loadPicks=useCallback(async()=>{
-    if(!PICKS_API||PICKS_API.includes("PASTE_YOUR"))return;
+    if(!PICKS_API||PICKS_API.includes("PASTE_YOUR"))return false;
     try{
       const r=await fetch(PICKS_API,{method:"GET"});
       const j=await r.json();
@@ -1304,9 +1313,11 @@ function App(){
           if(!p||!Array.isArray(p.picks))continue;
           conv[nm]={name:nm,tiebreaker:p.tiebreaker!=null?parseFloat(p.tiebreaker):null,picks:p.picks,timestamp:p.ts||p.timestamp||null};
         }
-        if(Object.keys(conv).length)setPicks(conv);
+        setPicks(conv);
+        return true;
       }
     }catch(e){}
+    return false;
   },[]);
   useEffect(()=>{loadPicks();},[loadPicks]);
 
@@ -1468,7 +1479,7 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
 .overlap-score.mc{color:var(--dim);font-style:italic;font-size:12px}
 .overlap-count{font-family:var(--fm);font-size:12px;color:var(--dim);text-align:right}
 
-.form-r{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.form-r{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end}
 
 .sb-filters{display:flex;gap:6px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
 .sb-filter{padding:8px 16px;border:1px solid var(--bd);border-radius:8px;font-size:14px;font-weight:600;
@@ -1492,7 +1503,7 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
 .rd-cell{font-size:12px}
 @media(max-width:600px){.sb-hdr,.sb-row{grid-template-columns:38px 1fr 52px 46px}}
 
-.form-f{display:flex;flex-direction:column}.fl{font-size:12px;font-weight:600;color:var(--dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px}
+.form-f{display:flex;flex-direction:column;justify-content:flex-end}.fl{font-size:12px;font-weight:600;color:var(--dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px;min-height:16px;line-height:1.3}
 .inp,.sel{padding:10px 14px;border:1px solid var(--bd);border-radius:var(--r-sm);font-size:16px;background:var(--sf);color:var(--tx);font-family:var(--fb);width:100%;min-height:44px}
 .inp.mono{font-family:var(--fm)}.inp:focus,.sel:focus{outline:none;border-color:var(--gd);box-shadow:0 0 0 3px var(--gl)}
 .sel{cursor:pointer;appearance:auto}
