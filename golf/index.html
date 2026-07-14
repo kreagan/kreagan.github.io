@@ -256,6 +256,15 @@ function LeaderboardView({tournament,picks,scores,lastUpdated,onRefresh,liveStat
   const pos=lb.map((_,i)=>i===0||lb[i].total==null?i+1:lb[i].total===lb[i-1].total?0:i+1);
   for(let i=1;i<pos.length;i++)if(pos[i]===0)pos[i]=pos[i-1];
 
+  if(picksOpen){
+    const n=Object.keys(picks).length;
+    return <div><Banner tournament={tournament}/>
+      <div className="info">
+        <strong>Standings reveal after the first tee.</strong> Picks stay hidden while entries are open — the leaderboard fills in once play begins.
+      </div>
+      <div className="reveal-count"><span className="rc-n">{n}</span><span className="rc-l">{n===1?"player has":"players have"} submitted so far</span></div>
+    </div>;
+  }
   if(!Object.keys(picks).length)return <div className="empty"><p className="empty-b">No picks yet</p><p className="empty-s">Picks appear once submitted.</p></div>;
 
   return <div><Banner tournament={tournament}/>
@@ -263,7 +272,7 @@ function LeaderboardView({tournament,picks,scores,lastUpdated,onRefresh,liveStat
     {!has&&<div className="info"><strong>Waiting for scores</strong> — Tournament hasn't started or scores haven't been imported.</div>}
     <div className="lb"><div className="lb-h"><span className="lb-r">#</span><span className="lb-n">Player</span>
       <span className="lb-sc">Best 4</span>{!picksOpen&&<span className="lb-tb hide-mobile">TB</span>}</div>
-    {picksOpen&&<div className="info" style={{margin:"4px 0 8px",display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18}}>🙈</span><span>Individual picks are hidden until the first tee — tap-to-expand and tiebreakers reveal once play begins.</span></div>}
+    {picksOpen&&<div className="info" style={{margin:"4px 0 8px"}}>Individual picks are hidden until the first tee — tap-to-expand and tiebreakers reveal once play begins.</div>}
     {lb.map((e,i)=><div key={e.name}><div className={`lb-row ${i%2===0?"ev":"od"}`} onClick={()=>{if(!picksOpen)setExp(exp===e.name?null:e.name);}} style={picksOpen?{cursor:"default"}:{}}>
       <span className={`lb-r ${pos[i]<=3&&has?"t3":""}`}>{pos[i]===1&&has?"🥇":pos[i]===2&&has?"🥈":pos[i]===3&&has?"🥉":pos[i]}</span>
       <span className="lb-n lb-nt">{e.name}{!picksOpen&&<span className="exp-a">{exp===e.name?"▲":"▼"}</span>}</span>
@@ -296,21 +305,16 @@ function TeamsView({picks,scores,picksOpen}){
   const popularity=useMemo(()=>{const m={};Object.values(picks).forEach(d=>d.picks.forEach(p=>{
     const n=parseOdds(p).name;m[n]=(m[n]||0)+1;}));return m;},[picks]);
 
-  if(!names.length)return <div className="empty"><p className="empty-b">No picks yet</p></div>;
-
   // While picks are still open, keep everyone's selections hidden so people can't copy
-  // each other. Show only who's submitted; reveal all teams once the first ball is struck.
+  // each other. Show only how many are in; reveal all teams once the first ball is struck.
   if(picksOpen)return <div>
-    <div className="info" style={{display:"flex",alignItems:"center",gap:10}}>
-      <span style={{fontSize:22}}>🙈</span>
-      <span><strong>Picks are hidden until the first tee.</strong> Everyone's teams reveal automatically once play begins — no peeking while entries are still open.</span>
+    <div className="info">
+      <strong>Teams reveal after the first tee.</strong> Everyone's picks are hidden while entries are still open — no copying. They'll appear here automatically once play begins.
     </div>
-    <div className="sub-track" style={{marginTop:12}}>
-      <span className="sub-ct">{names.length}</span><span> submitted</span>
-      <div style={{flex:1}}/>
-      {names.length>0&&<span className="sub-names">{names.join(", ")}</span>}
-    </div>
+    <div className="reveal-count"><span className="rc-n">{names.length}</span><span className="rc-l">{names.length===1?"player has":"players have"} submitted so far</span></div>
   </div>;
+
+  if(!names.length)return <div className="empty"><p className="empty-b">No picks yet</p></div>;
 
   const current=selected||names[0];
   const data=picks[current];
@@ -686,8 +690,6 @@ function PicksView({tournament,tiers,existingPicks,onSubmit,onSubmitted,particip
             {p}{already.has(p)?" ✓":""}</option>)}</select></div>
       <div className="form-f" style={{flex:"0 0 220px"}}><label className="fl">Tiebreaker (winner to par) *</label>
         <input type="number" value={tb} onChange={e=>setTb(e.target.value)} placeholder="-13" className="inp mono"/></div></div>
-    <div className="sub-track"><span className="sub-ct">{already.size}/{participants.length}</span><span> in</span>
-      <div style={{flex:1}}/>{already.size>0&&<span className="sub-names">{[...already].join(", ")}</span>}</div>
     <div className={`pc ${total===7?"ok":""}`}><span className="pc-n">{total}/7</span>
       <span className="pc-l">{total===7?" ✓ ready":" selected"}</span><div style={{flex:1}}/>
       {tks.map(k=><span key={k} className={`tc-c ${sel[k].length>=maxFor(k)?"full":""}`}>{tiers[k].label}: {sel[k].length}</span>)}</div>
@@ -1393,6 +1395,9 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
 .info{background:var(--card);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:1px solid var(--bd);
   border-radius:var(--r-sm);padding:14px 18px;margin-bottom:16px;font-size:15px;color:var(--dim);line-height:1.6;box-shadow:var(--shadow)}
 .info strong{color:var(--tx)}.info code{background:var(--sa);padding:2px 6px;border-radius:4px;font-family:var(--fm);font-size:12px}
+.reveal-count{display:flex;flex-direction:column;align-items:center;gap:4px;padding:28px 16px;background:var(--card);border:1px solid var(--bd);border-radius:var(--r);box-shadow:var(--shadow)}
+.reveal-count .rc-n{font-family:var(--fd);font-size:48px;line-height:1;color:var(--gd)}
+.reveal-count .rc-l{font-size:14px;color:var(--dim);font-family:var(--fm)}
 
 .sv{font-size:18px;font-weight:800;font-family:var(--fm)}.sv-sm{font-size:13px;font-weight:700;font-family:var(--fm)}
 .u{color:var(--gd)}.o{color:#ef4444}.ep{color:var(--tx)}.n{color:var(--dim)}
@@ -1610,7 +1615,8 @@ body{font-family:var(--fb);background:var(--cr);color:var(--tx);font-size:16px;l
 .empty{text-align:center;padding:48px 20px}.empty-b{font-size:22px;font-family:var(--fd);color:var(--tx);margin-bottom:8px}
 .empty-s{font-size:15px;color:var(--dim);max-width:400px;margin:0 auto;line-height:1.5}
 
-@media(max-width:500px){.form-r{flex-direction:column}.form-f{flex:1 1 auto!important}
+@media(max-width:500px){.form-r{flex-direction:column;align-items:stretch}.form-f{flex:1 1 auto!important;width:100%!important;max-width:100%!important}
+  .form-f .inp,.form-f .sel{width:100%}
   .logo-t{font-size:24px}.banner{padding:12px 16px}.bn{font-size:18px}
   .tc-header{padding:12px 16px}.tc-g{padding:10px 16px}.tc-name{font-size:18px}
   .overlap-row{grid-template-columns:1fr 44px 36px 44px;padding:6px 10px;font-size:13px}}
