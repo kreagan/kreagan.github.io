@@ -530,6 +530,15 @@ function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatu
           if(played>0)today=rel;
         }
       }
+      // Second fallback (no hole data needed): today = total − sum of completed rounds' to-par.
+      // A round's stroke total only lands in `rounds` once finished, so when a round is in
+      // progress (thru 1..17) the remainder after subtracting completed rounds IS today.
+      if(today==null&&score!=null&&Array.isArray(rounds)&&thru!=null&&thru>0&&thru<18){
+        const cp=((coursePars&&coursePars[0])||AUGUSTA_PARS).reduce((a,b)=>a+b,0)||70;
+        const completedToPar=rounds.filter(r=>r!=null).reduce((a,r)=>a+(r-cp),0);
+        const t=score-completedToPar;
+        if(t>=-18&&t<=18)today=t;   // sanity bound on a single round
+      }
       const mc=!!v?.mc;const wd=!!v?.wd;
       return {name,score,thru,rounds,teeTime,holes,today,mc,wd,owners:pickedBy[name]||[]};
     }).sort((a,b)=>{
