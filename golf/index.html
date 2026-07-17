@@ -514,7 +514,22 @@ function ScoreboardView({tournament,scores,picks,lastUpdated,onRefresh,liveStatu
     return Object.entries(scores).map(([name,v])=>{
       const{score,thru,rounds,teeTime}=typeof v==="number"?{score:v,thru:18,rounds:null,teeTime:null}:{score:v.s,thru:v.thru,rounds:v.r||null,teeTime:v.teeTime||null};
       const holes=v?.holes||null;
-      const today=v?.today??null;
+      let today=v?.today??null;
+      // Fallback: if the feed didn't give a "today" (ESPN never does, and PGAT sometimes
+      // omits currentRoundScore), derive it from the current round's hole-by-hole data.
+      // today = sum of (strokes − par) over holes actually played in the active round.
+      if(today==null&&holes&&Array.isArray(holes)){
+        const pars=(coursePars&&coursePars[0])||AUGUSTA_PARS;
+        // Active round = last round that has any hole data.
+        let ri=-1;
+        for(let i=0;i<holes.length;i++){if(holes[i]&&holes[i].some(s=>s!=null))ri=i;}
+        if(ri>=0){
+          const rd=holes[ri];let rel=0,played=0;
+          for(let h=0;h<18;h++){const s=rd[h];if(s!=null){rel+=s-(pars[h]??4);played++;}}
+          // Only show a today value once the round is underway but not obviously complete-from-prior-day
+          if(played>0)today=rel;
+        }
+      }
       const mc=!!v?.mc;const wd=!!v?.wd;
       return {name,score,thru,rounds,teeTime,holes,today,mc,wd,owners:pickedBy[name]||[]};
     }).sort((a,b)=>{
@@ -1086,7 +1101,7 @@ function parsePGATLeaderboard(data) {
     while (rounds.length < 4) rounds.push(null);
 
     let today = null;
-    const cr = sd.currentRoundScore;
+    const cr = sd.currentRoundScore ?? sd.today ?? sd.roundToPar ?? sd.thruScore;
     if (cr === "E" || cr === "0") today = 0;
     else if (cr != null && cr !== "" && cr !== "-") today = parseInt(cr);
     if (isNaN(today)) today = null;
@@ -1230,7 +1245,13 @@ function parseESPNMerged(headerData, scoreboardData) {
       if (isNaN(scoreToPar)) scoreToPar = null;
       const rounds = (c.linescores || []).map(ls => ls.value != null ? parseInt(ls.value) : null);
       while (rounds.length < 4) rounds.push(null);
-      scores[name] = { s: scoreToPar, thru: scoreToPar != null ? null : 0, r: rounds, teeTime: null, espnId: c.athlete?.id || c.id || null };
+      // ESPN sometimes exposes the current round's to-par; try common fields.
+      let today = null;
+      const et = c.status?.today ?? c.today ?? c.status?.round?.toPar;
+      if (et === "E" || et === "0" || et === 0) today = 0;
+      else if (et != null && et !== "" && et !== "-") today = parseInt(et);
+      if (isNaN(today)) today = null;
+      scores[name] = { s: scoreToPar, thru: scoreToPar != null ? null : 0, r: rounds, teeTime: null, today, espnId: c.athlete?.id || c.id || null };
     }
   }
 
@@ -1257,12 +1278,19 @@ function parseESPNMerged(headerData, scoreboardData) {
         }
         const rounds = (c.linescores || []).map(ls => { const v = typeof ls === "object" ? ls.value : ls; return v != null ? parseInt(v) : null; });
         while (rounds.length < 4) rounds.push(null);
+        // Current-round to-par ("today") if the header exposes it.
+        let today = null;
+        const ht = c.today ?? st.today ?? st.round?.toPar;
+        if (ht === "E" || ht === "0" || ht === 0) today = 0;
+        else if (ht != null && ht !== "" && ht !== "-") today = parseInt(ht);
+        if (isNaN(today)) today = null;
         // Find matching scoreboard entry (could be abbreviated)
         const matchKey = Object.keys(scores).find(k => k === name || k.endsWith(name.split(" ").pop()));
         if (matchKey) {
-          scores[matchKey] = { ...scores[matchKey], s: scoreToPar, thru, r: rounds, teeTime };
+          const prev = scores[matchKey];
+          scores[matchKey] = { ...prev, s: scoreToPar, thru, r: rounds, teeTime, today: today != null ? today : prev.today };
         } else {
-          scores[name] = { s: scoreToPar, thru, r: rounds, teeTime };
+          scores[name] = { s: scoreToPar, thru, r: rounds, teeTime, today };
         }
       }
     }
