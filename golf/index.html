@@ -1104,8 +1104,14 @@ function parsePGATLeaderboard(data) {
     const isWD = state === "WD" || state === "DQ";
 
     const rounds = (sd.rounds || []).map(r => {
-      const v = r.strokes || r.total;
-      return v != null ? parseInt(v) : null;
+      // Round entries vary in shape across PGAT responses. Accept a bare number,
+      // or an object keyed by strokes/total/score/value/scoreValue (any of them).
+      if (r == null) return null;
+      let v = (typeof r === "number" || typeof r === "string") ? r
+        : (r.strokes ?? r.total ?? r.score ?? r.value ?? r.scoreValue ?? r.roundScore ?? null);
+      if (v == null || v === "" || v === "-") return null;
+      const n = parseInt(v);
+      return isNaN(n) ? null : n;
     });
     while (rounds.length < 4) rounds.push(null);
 
@@ -1252,7 +1258,14 @@ function parseESPNMerged(headerData, scoreboardData) {
       if (c.score === "E" || c.score === "0" || c.score === 0) scoreToPar = 0;
       else if (c.score != null && c.score !== "") scoreToPar = parseInt(c.score);
       if (isNaN(scoreToPar)) scoreToPar = null;
-      const rounds = (c.linescores || []).map(ls => ls.value != null ? parseInt(ls.value) : null);
+      const rounds = (c.linescores || []).map(ls => {
+        if (ls == null) return null;
+        let v = (typeof ls === "number" || typeof ls === "string") ? ls
+          : (ls.value ?? ls.displayValue ?? ls.score ?? ls.strokes ?? null);
+        if (v == null || v === "" || v === "-") return null;
+        const n = parseInt(v);
+        return isNaN(n) ? null : n;
+      });
       while (rounds.length < 4) rounds.push(null);
       // ESPN sometimes exposes the current round's to-par; try common fields.
       let today = null;
@@ -1285,7 +1298,14 @@ function parseESPNMerged(headerData, scoreboardData) {
           thru = st.hole || null;
           anyActive = true;
         }
-        const rounds = (c.linescores || []).map(ls => { const v = typeof ls === "object" ? ls.value : ls; return v != null ? parseInt(v) : null; });
+        const rounds = (c.linescores || []).map(ls => {
+          if (ls == null) return null;
+          let v = (typeof ls === "number" || typeof ls === "string") ? ls
+            : (ls.value ?? ls.displayValue ?? ls.score ?? ls.strokes ?? null);
+          if (v == null || v === "" || v === "-") return null;
+          const n = parseInt(v);
+          return isNaN(n) ? null : n;
+        });
         while (rounds.length < 4) rounds.push(null);
         // Current-round to-par ("today") if the header exposes it.
         let today = null;
@@ -1295,9 +1315,13 @@ function parseESPNMerged(headerData, scoreboardData) {
         if (isNaN(today)) today = null;
         // Find matching scoreboard entry (could be abbreviated)
         const matchKey = Object.keys(scores).find(k => k === name || k.endsWith(name.split(" ").pop()));
+        const hasR = rounds.some(x => x != null);
         if (matchKey) {
           const prev = scores[matchKey];
-          scores[matchKey] = { ...prev, s: scoreToPar, thru, r: rounds, teeTime, today: today != null ? today : prev.today };
+          const prevHasR = Array.isArray(prev.r) && prev.r.some(x => x != null);
+          // Keep whichever source actually has round data; don't overwrite good rounds with blanks.
+          const mergedR = hasR ? rounds : (prevHasR ? prev.r : rounds);
+          scores[matchKey] = { ...prev, s: scoreToPar, thru, r: mergedR, teeTime, today: today != null ? today : prev.today };
         } else {
           scores[name] = { s: scoreToPar, thru, r: rounds, teeTime, today };
         }
